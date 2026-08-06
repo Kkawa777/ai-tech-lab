@@ -1,6 +1,6 @@
 # 公開前チェックメモ: 第1号記事(Arduinoとは？電子工作初心者だった僕が最初に選んだ理由と始め方)
 
-対象記事: [docs/articles/01-arduino-toha-hajimekata.md](../articles/01-arduino-toha-hajimekata.md)
+対象記事: [_articles/01-arduino-toha-hajimekata.md](../../_articles/01-arduino-toha-hajimekata.md)
 最終チェックの実施方法: [docs/publish-checklist.md](../publish-checklist.md)に準拠
 
 ## 人によるレビュー

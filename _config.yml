@@ -1,0 +1,30 @@
+title: AI-Tech-Lab
+tagline: 初心者から始める、AIと電子工作。
+description: >-
+  ESP8266・Arduino・AIをはじめとした電子工作を、初心者向けにやさしく解説するブログです。
+url: "https://kkawa777.github.io"
+baseurl: "/ai-tech-lab"
+
+collections:
+  articles:
+    output: true
+    permalink: /articles/:path/
+
+defaults:
+  - scope:
+      path: ""
+      type: "articles"
+    values:
+      layout: article
+
+markdown: kramdown
+
+exclude:
+  - docs/
+  - templates/
+  - README.md
+  - CLAUDE.md
+  - BRAND.md
+  - ROADMAP.md
+  - CONTENT_PLAN.md
+  - LICENSE

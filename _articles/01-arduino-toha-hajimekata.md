@@ -1,6 +1,8 @@
 ---
 title: Arduinoとは？電子工作初心者だった僕が最初に選んだ理由と始め方
 status: ready
+permalink: /articles/arduino-toha-hajimekata/
+order: 1
 category: Arduino入門
 difficulty: 初級
 estimated_time: 読了目安 約5分

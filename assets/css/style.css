@@ -1,0 +1,71 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  line-height: 1.8;
+  color: #222;
+  background: #fff;
+}
+
+a {
+  color: #06c;
+}
+
+.site-header {
+  padding: 1.5rem 1rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.site-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-decoration: none;
+  color: inherit;
+}
+
+.site-tagline {
+  margin: 0.25rem 0 1rem;
+  color: #666;
+}
+
+.site-header nav a {
+  margin-right: 1rem;
+  text-decoration: none;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.article img {
+  max-width: 100%;
+}
+
+.article pre {
+  overflow-x: auto;
+  padding: 1rem;
+  background: #f6f6f6;
+  border-radius: 4px;
+}
+
+.site-footer {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #999;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 600px) {
+  main {
+    padding: 1rem;
+  }
+}
