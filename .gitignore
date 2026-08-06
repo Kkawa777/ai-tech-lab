@@ -24,3 +24,6 @@ node_modules/
 
 # Logs
 *.log
+
+# cc-company (internal task/notes, not for public repo)
+.company/
