@@ -7,6 +7,9 @@ category: Arduino入門
 difficulty: 初級
 estimated_time: 読了目安 約5分
 description: 電子工作初心者だった僕が、仕事でArduinoを知ってから実際に始めるまでの理由・不安・つまずきを実体験ベースで紹介します。
+image:
+  path: /assets/images/articles/arduino-toha-hajimekata/eyecatch.webp
+  alt: Arduino初心者の電子工作とAI-Tech-Labの雰囲気を表したイメージ画像
 tested_hardware: 該当なし(具体的な検証情報は次記事「Arduinoで最初のLチカに挑戦」で扱う)
 tested_software: 該当なし(具体的なバージョン情報は次記事で扱う)
 amazon_products: 該当なし(本記事では製品紹介を行わない)
@@ -30,6 +33,9 @@ LEDやセンサー、モーターなどをプログラムで制御できる
 - モーターやサーボモーターを動かす
 - Wi-Fi対応ボードと組み合わせてインターネット経由でデータをやり取りする(IoT: モノをインターネットにつなぐ技術)
 - パソコンとシリアル通信してデータを送受信する
+
+![Arduinoを中心にLED・センサー・モーター・PC・IoTへつながる関係を示す概念図]({{ "/assets/images/articles/arduino-toha-hajimekata/arduino-overview.webp" | relative_url }})
+*Arduinoと周辺機器の関係を示すイメージ図（AI生成の概念図）*
 
 ## この記事でわかること
 
@@ -76,6 +82,9 @@ Arduino IDEの環境設定と、Arduinoへの書き込み方法でつまずき�
 ## 改善したこと
 
 原因を切り分けるにあたって、まずハード側の設定を確認し、その後にソフト側の試行錯誤を行うという順番で対応しました。理由は、ハード側の原因は選択肢が少なく絞り込みやすいと考えたためです。この順番で確認したことで、問題を整理しながら解決に近づけました。
+
+![ハード確認からソフト確認、書き込み再試行までの切り分け手順を示すフロー図]({{ "/assets/images/articles/arduino-toha-hajimekata/troubleshooting-flow.webp" | relative_url }})
+*トラブル時の切り分け手順を示すイメージ図（AI生成のフロー図）*
 
 ## 今ならこう作る
 
