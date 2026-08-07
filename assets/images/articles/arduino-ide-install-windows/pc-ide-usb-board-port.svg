@@ -1,0 +1,76 @@
+<svg viewBox="0 0 800 560" xmlns="http://www.w3.org/2000/svg" role="img" width="100%" height="auto">
+  <title>PC・IDE・USB・Arduinoボードの構成と、Board設定・Port設定がそれぞれ何を指すかを示す図</title>
+  <defs>
+    <marker id="arrow-neutral" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9ab" />
+    </marker>
+    <marker id="arrow-board" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M5,0 L10,5 L5,10 L0,5 z" fill="#b8860b" />
+    </marker>
+    <marker id="arrow-port" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <circle cx="5" cy="5" r="4" fill="#1a73c4" />
+    </marker>
+  </defs>
+
+  <style>
+    .box { fill:#fff; stroke:#06c; stroke-width:2; }
+    .label { font-family:sans-serif; font-size:20px; fill:#222; text-anchor:middle; font-weight:bold; }
+    .sublabel { font-family:sans-serif; font-size:12px; fill:#555; text-anchor:middle; }
+    .struct-line { stroke:#9ab; stroke-width:2; fill:none; marker-end:url(#arrow-neutral); }
+    .annot-line-board { stroke:#b8860b; stroke-width:2; fill:none; stroke-dasharray:7 5; marker-end:url(#arrow-board); }
+    .annot-line-port { stroke:#1a73c4; stroke-width:2; fill:none; stroke-dasharray:1 5; stroke-linecap:round; marker-end:url(#arrow-port); }
+    .annot-label { font-family:sans-serif; font-size:13px; text-anchor:middle; }
+    .annot-label-bg { fill:#fff; opacity:0.9; }
+  </style>
+
+  <!-- 構造線(実線、階層関係) -->
+  <path class="struct-line" d="M400,90 L233,158" />
+  <path class="struct-line" d="M400,90 L577,158" />
+  <path class="struct-line" d="M225,220 L128,298" />
+  <path class="struct-line" d="M245,220 L318,298" />
+  <path class="struct-line" d="M580,220 L580,298" />
+
+  <!-- 注釈線: Board -> Arduinoボード(「種類を指定」の関係。同一物ではないことを矢印と動詞ラベルで明示) -->
+  <path class="annot-line-board" d="M130,372 C130,470 500,480 570,372" />
+  <rect class="annot-label-bg" x="270" y="452" width="96" height="20" />
+  <text class="annot-label" x="318" y="467" fill="#b8860b">種類を指定 →</text>
+
+  <!-- 注釈線: Port -> USB(「接続先として認識」の関係。同一物ではないことを矢印と動詞ラベルで明示) -->
+  <path class="annot-line-port" d="M320,372 C320,420 480,300 570,224" />
+  <rect class="annot-label-bg" x="345" y="330" width="132" height="20" />
+  <text class="annot-label" x="411" y="345" fill="#1a73c4">接続先として認識 →</text>
+
+  <!-- PC -->
+  <rect class="box" x="340" y="30" width="120" height="60" rx="8" />
+  <text class="label" x="400" y="65">PC</text>
+
+  <!-- IDE -->
+  <rect class="box" x="160" y="160" width="140" height="60" rx="8" />
+  <text class="label" x="230" y="195">IDE</text>
+
+  <!-- USB -->
+  <rect class="box" x="500" y="160" width="140" height="60" rx="8" />
+  <text class="label" x="570" y="188">USB</text>
+  <text class="sublabel" x="570" y="206">物理接続</text>
+
+  <!-- Board -->
+  <rect class="box" x="60" y="300" width="140" height="72" rx="8" />
+  <text class="label" x="130" y="330">Board</text>
+  <text class="sublabel" x="130" y="348">ボード種類の設定</text>
+
+  <!-- Port -->
+  <rect class="box" x="250" y="300" width="140" height="72" rx="8" />
+  <text class="label" x="320" y="330">Port</text>
+  <text class="sublabel" x="320" y="348">PC側の接続先</text>
+
+  <!-- Arduinoボード(実物) -->
+  <rect class="box" x="500" y="300" width="160" height="72" rx="8" />
+  <text class="label" x="580" y="330">Arduinoボード</text>
+  <text class="sublabel" x="580" y="348">実際に接続されている機器</text>
+
+  <!-- 凡例(色以外の判別: 破線=Board系, 点線=Port系) -->
+  <line x1="60" y1="500" x2="110" y2="500" stroke="#b8860b" stroke-width="2" stroke-dasharray="7 5" />
+  <text class="sublabel" x="205" y="504" text-anchor="start">Board が指定する対象</text>
+  <line x1="60" y1="525" x2="110" y2="525" stroke="#1a73c4" stroke-width="2" stroke-dasharray="1 5" stroke-linecap="round" />
+  <text class="sublabel" x="205" y="529" text-anchor="start">Port が認識している対象</text>
+</svg>
