@@ -6,6 +6,7 @@ order: 1
 category: Arduino入門
 difficulty: 初級
 estimated_time: 読了目安 約5分
+description: 電子工作初心者だった僕が、仕事でArduinoを知ってから実際に始めるまでの理由・不安・つまずきを実体験ベースで紹介します。
 tested_hardware: 該当なし(具体的な検証情報は次記事「Arduinoで最初のLチカに挑戦」で扱う)
 tested_software: 該当なし(具体的なバージョン情報は次記事で扱う)
 amazon_products: 該当なし(本記事では製品紹介を行わない)

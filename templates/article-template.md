@@ -4,6 +4,10 @@ status: idea # idea / interview / draft / testing / review / ready
 category:
 difficulty: # 初級 / 中級 / 上級
 estimated_time:
+description: # 70〜120字程度。meta description / OGP descriptionに使用。未設定時はsite.descriptionにフォールバック
+image: # アイキャッチ画像(未設定時はOGP画像なしでビルド可能)
+  path: # 例: /assets/images/articles/<article-slug>/eyecatch.webp
+  alt: # 画像の内容を簡潔に説明する日本語
 tested_hardware:
 tested_software:
 amazon_products:

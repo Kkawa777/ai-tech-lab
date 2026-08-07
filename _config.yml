@@ -4,6 +4,12 @@ description: >-
   ESP8266・Arduino・AIをはじめとした電子工作を、初心者向けにやさしく解説するブログです。
 url: "https://kkawa777.github.io"
 baseurl: "/ai-tech-lab"
+lang: ja
+locale: ja_JP
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
 
 collections:
   articles:
