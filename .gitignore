@@ -27,3 +27,13 @@ node_modules/
 
 # cc-company (internal task/notes, not for public repo)
 .company/
+
+# Agent Skills (generated; restore via `npx skills experimental_install`)
+.agents/
+.claude/skills/
+
+# Scratch / working files
+scratchpad/
+
+# Separate practice repo (has its own .git/), not part of this project
+claude-code-practice/

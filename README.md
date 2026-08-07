@@ -35,3 +35,26 @@ ESP8266・Arduinoをはじめとした電子工作の情報を発信するブロ
 ├── .gitignore       # Git管理対象外の設定
 └── docs/            # 記事・ドキュメント置き場
 ```
+
+## Agent Skills
+
+このプロジェクトでは、Claude Code向けのAgent Skillsを使用しています。
+
+Skill本体となる `.agents/` と `.claude/skills/` は生成物としてGit管理対象外にしています。
+使用するSkillの構成は `skills-lock.json` で管理しています。
+
+リポジトリを新しい環境へクローンした場合は、プロジェクトルートで以下を実行してSkillを復元してください。
+
+```
+npx skills experimental_install
+```
+
+現在使用しているSkill：
+
+- frontend-design
+- seo
+- Skill Development
+
+※ experimental_install は現在使用しているskills CLI 1.5.22では
+skills-lock.jsonからSkillを復元する公式機能ですが、
+experimental機能のため将来コマンドや仕様が変更される可能性があります。
