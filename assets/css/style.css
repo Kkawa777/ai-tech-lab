@@ -57,6 +57,28 @@ main {
   border-radius: 4px;
 }
 
+.article blockquote {
+  margin: 1.5rem 0;
+  padding: 0.9rem 1.1rem;
+  border-left: 4px solid #e8b923;
+  background: #fffbea;
+  border-radius: 0 6px 6px 0;
+}
+
+.article blockquote p {
+  margin: 0.3rem 0;
+}
+
+.article h2 {
+  margin-top: 2.2rem;
+  font-size: 1.3rem;
+}
+
+.article h3 {
+  margin-top: 1.6rem;
+  font-size: 1.1rem;
+}
+
 .site-footer {
   text-align: center;
   padding: 2rem 1rem;
@@ -64,8 +86,173 @@ main {
   font-size: 0.875rem;
 }
 
+/* Hero (top page) */
+.hero {
+  padding: 1.5rem 0;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 1.5rem;
+}
+
+.hero-title {
+  font-size: 1.75rem;
+  margin: 0 0 0.25rem;
+}
+
+.hero-tagline {
+  color: #06c;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.hero-description {
+  color: #444;
+  margin: 0 0 1.25rem;
+}
+
+.pillar-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pillar-card {
+  display: inline-block;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #cfe0f5;
+  border-radius: 999px;
+  background: #f4f8fd;
+  color: #06c;
+  font-size: 0.875rem;
+}
+
+/* Article cards (list, related, featured) */
+.article-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.article-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  background: #fff;
+  transition: border-color 0.15s ease;
+}
+
+.article-card:hover {
+  border-color: #06c;
+}
+
+.article-card-thumb {
+  width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  background: #eef4fb;
+  display: block;
+}
+
+.article-card-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #06c;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.article-card-body {
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.article-card-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.article-card-title {
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.article-card-time {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.badge-category {
+  background: #eaf2fc;
+  color: #06c;
+}
+
+.badge-difficulty {
+  background: #eefaf0;
+  color: #2a8a4a;
+}
+
+.badge-time {
+  background: #f4f4f4;
+  color: #666;
+}
+
+/* Article page header */
+.article-header {
+  margin-bottom: 1.5rem;
+}
+
+.article-title {
+  font-size: 1.6rem;
+  line-height: 1.4;
+  margin: 0 0 0.6rem;
+}
+
+.article-meta {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.article-eyecatch {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
 @media (max-width: 600px) {
   main {
     padding: 1rem;
+  }
+
+  .article-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pillar-cards {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-title {
+    font-size: 1.5rem;
   }
 }

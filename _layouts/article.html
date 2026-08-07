@@ -2,5 +2,17 @@
 layout: default
 ---
 <article class="article">
+  <header class="article-header">
+    <h1 class="article-title">{{ page.title }}</h1>
+    <div class="article-meta">
+      {% if page.category %}<span class="badge badge-category">{{ page.category }}</span>{% endif %}
+      {% if page.difficulty %}<span class="badge badge-difficulty">{{ page.difficulty }}</span>{% endif %}
+      {% if page.estimated_time %}<span class="badge badge-time">{{ page.estimated_time }}</span>{% endif %}
+    </div>
+    {% if page.image.path %}
+    <img class="article-eyecatch" src="{{ page.image.path | relative_url }}" alt="{{ page.image.alt | default: page.title }}">
+    {% endif %}
+  </header>
+
   {{ content }}
 </article>
