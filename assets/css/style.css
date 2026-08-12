@@ -69,6 +69,34 @@ main {
   margin: 0.3rem 0;
 }
 
+.article table {
+  display: block;
+  overflow-x: auto;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+}
+
+.article th,
+.article td {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid #e5e5e5;
+  text-align: left;
+  vertical-align: top;
+}
+
+.article th {
+  background: #f4f8fd;
+  color: #06c;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.article td {
+  min-width: 140px;
+}
+
 .article h2 {
   margin-top: 2.2rem;
   font-size: 1.3rem;
@@ -254,5 +282,18 @@ main {
 
   .hero-title {
     font-size: 1.5rem;
+  }
+
+  .article table {
+    font-size: 0.8rem;
+  }
+
+  .article th,
+  .article td {
+    padding: 0.45rem 0.6rem;
+  }
+
+  .article td {
+    min-width: 110px;
   }
 }
