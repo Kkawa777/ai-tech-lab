@@ -140,8 +140,8 @@ Windows環境でのArduino IDE導入は、インストール作業そのもの�
 ## 関連記事
 
 - [Arduinoとは？電子工作初心者だった僕が最初に選んだ理由と始め方]({{ "/articles/arduino-toha-hajimekata/" | relative_url }})
+- [Arduino初心者向けスターターキットの選び方｜5,000円キットのその後]({{ "/articles/arduino-starter-kit-guide/" | relative_url }})
 
 今後公開予定の記事
 
-- 最初に買うべきArduinoスターターキットの選び方
 - Arduinoで最初のLチカに挑戦

@@ -106,8 +106,8 @@ A. 部品選びの詳しいポイントは、別記事「Arduinoスターター�
 ## 関連記事
 
 - [Arduino IDEのインストール方法(Windows版)｜ボード認識・書き込みでつまずいた話]({{ "/articles/arduino-ide-install-windows/" | relative_url }})
+- [Arduino初心者向けスターターキットの選び方｜5,000円キットのその後]({{ "/articles/arduino-starter-kit-guide/" | relative_url }})
 
 今後公開予定の記事
 
 - Arduinoで最初のLチカに挑戦
-- Arduinoスターターキットの選び方
