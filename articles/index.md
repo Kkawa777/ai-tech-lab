@@ -11,7 +11,7 @@ permalink: /articles/
 {% for article in ready_articles %}
   <a class="article-card" href="{{ article.permalink | relative_url }}">
     {% if article.image.path %}
-    <img class="article-card-thumb" src="{{ article.image.path | relative_url }}" alt="{{ article.image.alt | default: article.title }}">
+    <img class="article-card-thumb" src="{{ article.image.path | relative_url }}" alt="{{ article.image.alt | default: article.title }}" width="1200" height="630" loading="lazy" decoding="async">
     {% else %}
     <span class="article-card-thumb article-card-thumb--placeholder">{{ article.category | slice: 0, 1 }}</span>
     {% endif %}

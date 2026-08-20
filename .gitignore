@@ -29,11 +29,25 @@ node_modules/
 .company/
 
 # Agent Skills (generated; restore via `npx skills experimental_install`)
+# Only the package-managed skills are ignored by name (not `.claude/skills/` as a
+# whole) so project-authored skills such as quality-development stay in Git.
+# Git cannot re-include a file once a parent directory is excluded, so a blanket
+# `.claude/skills/` ignore + negation does not work here.
 .agents/
-.claude/skills/
+.claude/skills/frontend-design/
+.claude/skills/seo/
+.claude/skills/skill-development/
+
+# Claude Code local runtime state (session-specific, not project source)
+.claude/scheduled_tasks.lock
 
 # Scratch / working files
 scratchpad/
 
 # Separate practice repo (has its own .git/), not part of this project
 claude-code-practice/
+
+# Sibling projects (each has its own .git/, unrelated to AI-Tech-Lab; may contain .env secrets)
+ai-content-engine/
+global-trend-discovery/
+line-stock-news-bot/

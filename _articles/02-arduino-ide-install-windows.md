@@ -30,6 +30,7 @@ Arduino IDE(アイディーイー)は、Arduinoにプログラムを書き込む
 - 今から始めるならおすすめしたい準備の順番
 
 ![公式サイトからのダウンロードから動作確認までの9ステップを示すインストールフロー図]({{ "/assets/images/articles/arduino-ide-install-windows/install-write-flow.webp" | relative_url }})
+{: width="1200" height="900" loading="lazy" decoding="async"}
 *インストール〜書き込みまでの流れを示すイメージ図（AI生成のフロー図）*
 
 ## この記事はこんな人におすすめ
@@ -63,6 +64,7 @@ Arduino公式サイト(arduino.cc)からWindows版のインストーラーをダ
 インストール完了後、Arduino IDEを起動します。ここまでのインストール作業全体を通して、大きな問題はありませんでした。
 
 ![PC・Arduino IDE・USB・Arduinoボードの関係と、Board設定・Port設定がそれぞれ何を指すかを示す構成図]({{ "/assets/images/articles/arduino-ide-install-windows/pc-ide-usb-board-port.svg" | relative_url }})
+{: width="800" height="560" loading="lazy" decoding="async"}
 *PC・IDE・USB・Arduinoボードの関係を示す構成図（Board＝ボード種類の設定、Port＝接続先の設定）*
 
 ## ボード設定・接続でつまずいたこと
@@ -91,6 +93,7 @@ Arduino公式サイト(arduino.cc)からWindows版のインストーラーをダ
 書き込みができない状態が続いたときは、PC側のポート設定を見直したことは覚えています。ただし、それ以外に具体的にどの設定をどう変更したかまでは、はっきりと覚えていません。そのため、当時行った具体的な解決手順については、この記事では断定しません(記憶が曖昧なため未確認)。
 
 ![認識確認からUSB・Board・Port確認、再書き込み、ソフト設定確認までの切り分け手順を示すトラブルシューティング図]({{ "/assets/images/articles/arduino-ide-install-windows/troubleshooting-flow.webp" | relative_url }})
+{: width="900" height="1350" loading="lazy" decoding="async"}
 *書き込みができない時の切り分け手順を示すイメージ図（AI生成のフロー図）*
 
 ### 2026年現在の公式情報で確認すると

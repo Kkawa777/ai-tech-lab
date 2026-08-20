@@ -12,7 +12,19 @@ image:
   alt: Arduinoスターターキットからセンサーを追加し、電子工作の幅が広がっていく様子を表したイメージイラスト
 tested_hardware: Arduino Uno相当のスターターキット(当時Amazonで購入。具体的な商品名・型番は特定できず)
 tested_software: 該当なし(本記事は部品選びが中心のテーマのため、ソフトウェアの検証は行っていません)
-amazon_products: 本文中でB06Y56JV64・B08KYFQSWZの2商品を、筆者未使用・公開情報に基づく比較材料として紹介(2026年8月8日確認)。ほかの構成のキットは本文内で一般的な説明のみ。今回はアフィリエイトリンク・商品ボックスは未設置。
+amazon_products: 本文中でB06Y56JV64・B08KYFQSWZの2商品を、筆者未使用・公開情報に基づく比較材料として紹介(2026年8月8日確認)。ほかの構成のキットは本文内で一般的な説明のみ。
+content_type: commercial
+primary_keyword: Arduino スターターキット 選び方
+search_intent: 何を買えば失敗しないか、実際に使った人の経験から選ぶ基準を知りたい
+monetization: amazon_affiliate
+conversion_goal: amazon_cta_click
+affiliate_products:
+  - asin: B06Y56JV64
+    role: candidate
+    label: ELEGOO UNO R3 最終版スタータキット(63 Items)
+  - asin: B08KYFQSWZ
+    role: candidate
+    label: UNO R3開発ボード(単体)
 ---
 
 ## Arduinoのスターターキットとは？
@@ -22,6 +34,7 @@ Arduinoのスターターキットとは、Arduino本体に加えて、ブレッ
 筆者がArduinoを始めた経緯は第1号記事「[Arduinoとは？電子工作初心者だった僕が最初に選んだ理由と始め方]({{ "/articles/arduino-toha-hajimekata/" | relative_url }})」で、Arduino IDEのインストール方法は第2号記事「[Arduino IDEのインストール方法(Windows版)｜ボード認識・書き込みでつまずいた話]({{ "/articles/arduino-ide-install-windows/" | relative_url }})」で紹介しています。この記事では、その最初の一歩である「スターターキット選び」について、実際に購入した経験をもとに紹介します。
 
 ![Arduinoスターターキットに含まれる代表的な部品(ボード・ブレッドボード・配線・LED・センサーなど)を示す概念図]({{ "/assets/images/articles/arduino-starter-kit-guide/starter-kit-parts-overview.webp" | relative_url }})
+{: width="1200" height="900" loading="lazy" decoding="async"}
 *スターターキットに含まれる代表的な部品を示すイメージ図（AI生成の概念図）*
 
 ## この記事でわかること
@@ -59,6 +72,7 @@ Amazonで、約5,000円のArduino Unoスターターキットを購入しまし�
 一方で、使っていくうちに「もっとセンサー類が豊富なキットを選べばよかった」と感じるようになりました。基本的なキットだった分、センサーの種類はそれほど多くなかったためです。
 
 ![スターターキット購入からセンサー追加、配達物検知・雨検知へ発展した体験の流れを示すフロー図]({{ "/assets/images/articles/arduino-starter-kit-guide/experience-flow.webp" | relative_url }})
+{: width="900" height="1350" loading="lazy" decoding="async"}
 *スターターキットからセンサーを追加し、作品へ発展していった体験を示す図（AI生成のフロー図）*
 
 ## 追加で購入したもの
@@ -106,6 +120,8 @@ Amazonで、約5,000円のArduino Unoスターターキットを購入しまし�
 
 これは「実際に使っておすすめ」ということではなく、あくまで当時の経験を踏まえて「今の自分ならこういう構成を選びたい」という具体例としての紹介です。ボード単体(B08KYFQSWZ)との比較で言えば、ブレッドボードや配線、出力部品が最初から揃っているスターターキットのほうが、初心者としては始めやすいと感じています。
 
+{% include amazon-cta.html asin="B06Y56JV64" label="Amazonで現在のセット内容を確認する" position="today-choice" article="arduino-starter-kit-guide" used=false %}
+
 ## よくある質問
 
 **Q. スターターキットと、部品を単品で揃えるのはどちらがいいですか？**
@@ -113,6 +129,8 @@ A. 筆者の実体験としては、スターターキットを選んで良か�
 
 **Q. 今ならどんなキットを選びますか？**
 A. センサーの種類が多く、モーターなど出力部品も含まれている構成を選びたいと考えています。本文で紹介したELEGOO UNO R3 最終版スタータキット(B06Y56JV64)はその一例ですが、筆者自身が使用した商品ではなく、公開情報に基づく候補として紹介しています。
+
+{% include amazon-cta.html asin="B06Y56JV64" label="Amazonで現在のセット内容を確認する" position="faq-q2" article="arduino-starter-kit-guide" used=false %}
 
 **Q. 追加購入は必ず必要になりますか？**
 A. 必ずとは言い切れませんが、筆者の場合は電子工作を続ける中で約1万円分のセンサー類を追加購入しました。最初のキット選びの時点でセンサーの種類を意識しておくと、追加購入の必要性を減らせる可能性があります。

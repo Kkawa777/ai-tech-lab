@@ -10,9 +10,19 @@ layout: default
       {% if page.estimated_time %}<span class="badge badge-time">{{ page.estimated_time }}</span>{% endif %}
     </div>
     {% if page.image.path %}
-    <img class="article-eyecatch" src="{{ page.image.path | relative_url }}" alt="{{ page.image.alt | default: page.title }}">
+    {%- comment -%}
+    width/height fixed at 1200x630 (site convention for all eyecatch images, see
+    templates/article-template.md) to prevent layout shift (CLS) before the image
+    loads. No loading="lazy" here: this is the first visual content on the page and
+    is typically the LCP element, so it should load eagerly.
+    {%- endcomment -%}
+    <img class="article-eyecatch" src="{{ page.image.path | relative_url }}" alt="{{ page.image.alt | default: page.title }}" width="1200" height="630">
     {% endif %}
   </header>
+
+  {% if page.affiliate_products %}
+  {% include affiliate-disclosure.html scope="article" %}
+  {% endif %}
 
   {{ content }}
 </article>

@@ -10,7 +10,18 @@ image: # アイキャッチ画像(未設定時はOGP画像なしでビルド可�
   alt: # 画像の内容を簡潔に説明する日本語
 tested_hardware:
 tested_software:
-amazon_products:
+amazon_products: # 自由記述の要約(何をどう紹介したか等の注記)。CTA表示には使われない。CTA用の
+# 構造化データは下のaffiliate_productsを使う(名前が似ているが役割が異なるので注意)
+# 収益化メタデータ(すべて任意。未設定でも既存記事の挙動に影響しない)
+content_type: # informational / commercial / transactional
+primary_keyword: # 主要検索キーワード1つ
+search_intent: # 検索意図。descriptionと内容が重複してよい
+monetization: # none / amazon_affiliate
+conversion_goal: # 例: amazon_cta_click
+affiliate_products: # 商品メタデータ台帳(任意)。実際のCTA表示は本文の{% include amazon-cta.html %}で行う
+# - asin:
+#   role: # used(実際に使用) / candidate(未使用・公開情報に基づく候補)
+#   label:
 ---
 
 ## この記事でわかること
@@ -60,7 +71,9 @@ amazon_products:
 
 ## Amazonで紹介する商品
 
-<!-- 読者の課題解決に必要な場合のみ。実際に使用したものを優先し、選定理由を記載 -->
+<!-- 読者の課題解決に必要な場合のみ。実際に使用したものを優先し、選定理由を記載。
+     CTAボタンは {% include amazon-cta.html asin="..." label="..." position="..." article="..." used=true|false %}
+     を使う(直接<a>タグやアフィリエイトURLを本文へ書かない)。未使用商品は used=false を指定する -->
 
 ## よくある質問
 

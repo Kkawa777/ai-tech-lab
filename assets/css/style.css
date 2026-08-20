@@ -97,6 +97,56 @@ main {
   min-width: 140px;
 }
 
+/* Amazon Affiliate CTA */
+.amazon-cta {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.75rem 0;
+}
+
+.amazon-cta-button {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  background: #06c;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+}
+
+.amazon-cta-button:hover {
+  background: #0558ab;
+}
+
+.amazon-cta-button--disabled {
+  background: #ddd;
+  color: #777;
+  cursor: not-allowed;
+}
+
+.amazon-cta-note {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* Affiliate disclosure */
+.affiliate-disclosure {
+  font-size: 0.8rem;
+  color: #666;
+  background: #f6f6f6;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin: 1rem 0;
+}
+
+.site-footer .affiliate-disclosure {
+  max-width: 480px;
+  margin: 1rem auto 0;
+  text-align: left;
+}
+
 .article h2 {
   margin-top: 2.2rem;
   font-size: 1.3rem;

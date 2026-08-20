@@ -3,13 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {%- assign gsc_token = site.search_console.verification_token | default: "" -%}
+  {%- if gsc_token != "" -%}
+  <meta name="google-site-verification" content="{{ gsc_token }}">
+  {%- endif -%}
   {% seo %}
   <link rel="stylesheet" href="{{ "/assets/css/style.css" | relative_url }}">
+  {% include ga4.html %}
 </head>
 <body>
   <header class="site-header">
-    <a class="site-title" href="{{ "/" | relative_url }}">{{ site.title }}</a>
-    <p class="site-tagline">{{ site.tagline }}</p>
+    <a class="site-title" href="{{ "/" | relative_url }}">{{ site.title | escape }}</a>
+    <p class="site-tagline">{{ site.tagline | escape }}</p>
     <nav>
       <a href="{{ "/" | relative_url }}">ホーム</a>
       <a href="{{ "/articles/" | relative_url }}">記事一覧</a>
@@ -21,7 +26,8 @@
   </main>
 
   <footer class="site-footer">
-    <p>&copy; {{ site.time | date: "%Y" }} {{ site.title }}</p>
+    <p>&copy; {{ site.time | date: "%Y" }} {{ site.title | escape }} ／ <a href="{{ "/privacy/" | relative_url }}">プライバシーポリシー</a></p>
+    {% include affiliate-disclosure.html scope="site" %}
   </footer>
 </body>
 </html>

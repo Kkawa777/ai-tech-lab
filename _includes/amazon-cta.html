@@ -1,0 +1,52 @@
+{%- comment -%}
+Amazon Affiliate CTA component.
+
+Usage:
+  {% include amazon-cta.html asin="B06Y56JV64" label="Amazonで現在のセット内容を確認する"
+     position="today-choice" article="arduino-starter-kit-guide" used=false %}
+
+Params:
+  asin     (required) Amazon ASIN. Must be a value the owner explicitly provided/confirmed.
+  label    (optional) Button text. Defaults to "Amazonで確認する".
+  position (optional) Free-text identifier for where on the page this CTA sits
+           (e.g. "today-choice", "faq-q2"). Read by assets/js/affiliate-tracking.js
+           as the data-affiliate-position attribute of the amazon_click GA4 event.
+  article  (optional) Article slug. Read by assets/js/affiliate-tracking.js as the
+           data-affiliate-article attribute of the amazon_click GA4 event.
+  used     (optional) Pass true only if the author actually used this product.
+           Fail-safe default: omitting this param (or passing false) shows the
+           "unused candidate" note, so a future call that forgets this param never
+           silently claims real usage. Only affects the disclosure note text; never
+           claims "recommended" either way.
+
+The Amazon URL is built with the standard `?tag=` affiliate parameter (the
+documented manual tagging format), not Amazon's browser-extension "Special
+Link" shortener, and not fetched/generated via any Amazon API or scraping.
+
+While site.amazon.associate_tag is empty, this component renders a disabled,
+non-clickable state so no non-functional or placeholder affiliate link is
+ever exposed as live.
+{%- endcomment -%}
+{%- assign tag = site.amazon.associate_tag | default: "" -%}
+{%- assign label = include.label | default: "Amazonで確認する" -%}
+<span class="amazon-cta">
+  {%- if tag == "" -%}
+  <span class="amazon-cta-button amazon-cta-button--disabled"
+        role="button"
+        data-affiliate-product="{{ include.asin }}"
+        data-affiliate-position="{{ include.position }}"
+        data-affiliate-article="{{ include.article }}"
+        data-affiliate-active="false"
+        aria-disabled="true">{{ label }}(準備中)</span>
+  <span class="amazon-cta-note">このリンクは現在準備中です。{% unless include.used == true %}筆者未使用・公開情報に基づく候補です。{% endunless %}</span>
+  {%- else -%}
+  <a class="amazon-cta-button"
+     href="https://www.amazon.co.jp/dp/{{ include.asin }}?tag={{ tag }}"
+     target="_blank" rel="nofollow sponsored noopener"
+     data-affiliate-product="{{ include.asin }}"
+     data-affiliate-position="{{ include.position }}"
+     data-affiliate-article="{{ include.article }}"
+     data-affiliate-active="true">{{ label }}</a>
+  <span class="amazon-cta-note">※Amazonアソシエイトリンクです。{% unless include.used == true %}筆者未使用・公開情報に基づく候補です。{% endunless %}価格・在庫はAmazonのページでご確認ください。</span>
+  {%- endif -%}
+</span>

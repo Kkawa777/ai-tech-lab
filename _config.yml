@@ -11,6 +11,19 @@ plugins:
   - jekyll-seo-tag
   - jekyll-sitemap
 
+# Amazon Associates設定。associate_tagが空の間は amazon-cta.html が実際の
+# アフィリエイトリンクを生成せず、CTAは無効(準備中)表示になる。ビルドはこの値が
+# 空でも成功する。実際のタグはオーナーが値を設定する(このリポジトリでは自動生成しない)。
+amazon:
+  associate_tag: "aitechlab-22"
+
+# Google Analytics 4 / Search Console設定。値が空の間は該当コードを一切出力しない
+# (安全なplaceholder状態でビルド可能)。IDやトークンはこのリポジトリでは生成しない。
+analytics:
+  ga4_measurement_id: "G-Y4Z46T0QSD"
+search_console:
+  verification_token: "RS-TG6R2E58RkqzKauAOZpsK9UZKjFp0mvaTeDNU9hY"
+
 collections:
   articles:
     output: true
@@ -28,6 +41,7 @@ markdown: kramdown
 exclude:
   - docs/
   - templates/
+  - scripts/
   - README.md
   - CLAUDE.md
   - BRAND.md

@@ -33,6 +33,7 @@ LEDやセンサー、モーターなどをプログラムで制御できる
 - パソコンとシリアル通信してデータを送受信する
 
 ![Arduinoを中心にLED・センサー・モーター・PC・IoTへつながる関係を示す概念図]({{ "/assets/images/articles/arduino-toha-hajimekata/arduino-overview.webp" | relative_url }})
+{: width="1200" height="900" loading="lazy" decoding="async"}
 *Arduinoと周辺機器の関係を示すイメージ図（AI生成の概念図）*
 
 ## この記事でわかること
@@ -82,6 +83,7 @@ Arduino IDEの環境設定と、Arduinoへの書き込み方法でつまずき�
 原因を切り分けるにあたって、まずハード側の設定を確認し、その後にソフト側の試行錯誤を行うという順番で対応しました。理由は、ハード側の原因は選択肢が少なく絞り込みやすいと考えたためです。この順番で確認したことで、問題を整理しながら解決に近づけました。
 
 ![ハード確認からソフト確認、書き込み再試行までの切り分け手順を示すフロー図]({{ "/assets/images/articles/arduino-toha-hajimekata/troubleshooting-flow.webp" | relative_url }})
+{: width="900" height="1200" loading="lazy" decoding="async"}
 *トラブル時の切り分け手順を示すイメージ図（AI生成のフロー図）*
 
 ## 今ならこう作る

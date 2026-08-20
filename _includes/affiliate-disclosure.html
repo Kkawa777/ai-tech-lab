@@ -1,0 +1,28 @@
+{%- comment -%}
+Affiliate disclosure. Required wording sourced verbatim from the Amazon.co.jp
+Associates Program Operating Agreement (affiliate.amazon.co.jp), Section 5,
+confirmed via direct fetch 2026-08-17:
+"Amazonのアソシエイトとして、［乙の名称を挿入］は適格販売により収入を得ています。"
+"乙" (the Associate) is filled in with site.title per the template's own instruction
+to insert the associate's name. The English line is supplementary, not a substitute
+for the Japanese line (the agreement does not confirm English alone is sufficient
+for a Japan-facing site).
+Only rendered while site.amazon.associate_tag is set, so the site never states an
+earnings relationship before the Associates link is actually live.
+
+Usage: {% include affiliate-disclosure.html scope="site" %}  (footer, every page)
+       {% include affiliate-disclosure.html scope="article" %} (top of articles with affiliate_products)
+{%- endcomment -%}
+{%- assign tag = site.amazon.associate_tag | default: "" -%}
+{%- if tag != "" -%}
+{%- if include.scope == "site" -%}
+<p class="affiliate-disclosure affiliate-disclosure--site">
+  Amazonのアソシエイトとして、{{ site.title | escape }}は適格販売により収入を得ています。<br>
+  (As an Amazon Associate I earn from qualifying purchases.)
+</p>
+{%- else -%}
+<p class="affiliate-disclosure affiliate-disclosure--article">
+  この記事にはAmazonアソシエイト・プログラムによる商品リンクが含まれます。リンクを経由して商品が購入された場合、当サイトに紹介料が支払われることがあります。
+</p>
+{%- endif -%}
+{%- endif -%}

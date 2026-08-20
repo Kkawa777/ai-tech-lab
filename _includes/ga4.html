@@ -1,0 +1,24 @@
+{%- comment -%}
+GA4 loader. Emits nothing unless BOTH are true:
+  (a) site.analytics.ga4_measurement_id is set (owner-provided; never generated here)
+  (b) jekyll.environment == "production" (so local `jekyll serve`/preview builds never
+      send real events; GitHub's official jekyll-build-pages action sets this env var)
+Progressive enhancement: every page (including affiliate CTAs) is fully functional
+without this script. It only adds page_view (via the standard gtag config call) and,
+through affiliate-tracking.js, an `amazon_click` event. No personal data is collected -
+only the product/position/article identifiers already present as data-affiliate-*
+attributes on the CTA markup.
+{%- endcomment -%}
+{%- assign ga_id = site.analytics.ga4_measurement_id | default: "" -%}
+{%- if ga_id != "" and jekyll.environment == "production" -%}
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="preconnect" href="https://www.google-analytics.com">
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_id }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{ ga_id }}');
+</script>
+<script src="{{ "/assets/js/affiliate-tracking.js" | relative_url }}" defer></script>
+{%- endif -%}
