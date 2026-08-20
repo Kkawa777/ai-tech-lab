@@ -103,11 +103,37 @@ AI-Tech-Labは「初心者がAIと一緒に電子工作を学べる技術メデ�
 
 ## 品質チェック
 
-記事を完成させる前に、以下をセルフレビューしてください。
+執筆中の簡易セルフチェックです(公開直前の最終判定は下記「公開ゲート」で行うため、
+この項目だけで`ready`にしてよいわけではありません)。
 
 - 初心者でも理解できるか
 - 実体験が入っているか
 - SEOを意識しているか
 - Amazon商品が自然に紹介されているか
+
+## 公開ゲート(SEO / Quality / Affiliate / Publication)
+
+`ready`にする前に、以下4つのGateを満たしているか確認する。詳細な確認項目は
+`docs/publish-checklist.md`、実施手順は`quality-development` Skillを正本とし、
+ここには複製しない。
+
+### SEO Gate
+primary keyword / search intent / title / description / H1 / internal links / canonical / OGP
+
+### Quality Gate
+初心者が理解できる / 実体験が入っている(創作していないだけでなく、実体験の記述そのものが存在する) /
+技術的に正しい / 未確認情報を断定していない / 安全上の問題がない
+
+### Affiliate Gate
+商品紹介が自然か / 実使用・未使用の区別が明確か / 誤認表現がないか / affiliate disclosure / CTA / affiliate URL
+
+### Publication Gate
+frontmatter / images・alt / links / responsive / `git diff --check` / build / GitHub Actions / 公開後確認
+
+## 品質管理フロー
+
+コード実装・記事執筆・設計・ドキュメント作成など、レビューに値する成果物を作る作業では、
+`quality-development` Skill(`.claude/skills/quality-development/`)に従う。
+Independent Review・Self Evaluation・Iterative Refinementの詳細手順はそちらを正本とする。
 
 更新前に変更内容を説明してください。
