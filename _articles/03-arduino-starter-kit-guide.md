@@ -143,7 +143,4 @@ A. 必ずとは言い切れませんが、筆者の場合は電子工作を続�
 
 - [Arduinoとは？電子工作初心者だった僕が最初に選んだ理由と始め方]({{ "/articles/arduino-toha-hajimekata/" | relative_url }})
 - [Arduino IDEのインストール方法(Windows版)｜ボード認識・書き込みでつまずいた話]({{ "/articles/arduino-ide-install-windows/" | relative_url }})
-
-今後公開予定の記事
-
-- Arduinoで最初のLチカに挑戦
+- [Arduinoで最初のLチカ(LED点滅)に挑戦]({{ "/articles/arduino-lchika/" | relative_url }})

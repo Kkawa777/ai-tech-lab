@@ -72,7 +72,7 @@ Arduinoの本体と専用ケースを購入して始めました。具体的な�
 
 最初に動かしたのは、シリアルモニタに「Hello World」を表示させるプログラムでした。そのあと、LEDを配線してLチカ(LEDの点滅)を動かしました。
 
-サンプルコードと具体的な配線手順については、別記事「Arduinoで最初のLチカに挑戦」で扱う予定です。
+サンプルコードと具体的な配線手順については、第4号記事「[Arduinoで最初のLチカ(LED点滅)に挑戦]({{ "/articles/arduino-lchika/" | relative_url }})」で紹介しています。
 
 ## 失敗したこと
 
@@ -109,7 +109,4 @@ A. 部品選びの詳しいポイントは、別記事「Arduinoスターター�
 
 - [Arduino IDEのインストール方法(Windows版)｜ボード認識・書き込みでつまずいた話]({{ "/articles/arduino-ide-install-windows/" | relative_url }})
 - [Arduino初心者向けスターターキットの選び方｜5,000円キットのその後]({{ "/articles/arduino-starter-kit-guide/" | relative_url }})
-
-今後公開予定の記事
-
-- Arduinoで最初のLチカに挑戦
+- [Arduinoで最初のLチカ(LED点滅)に挑戦]({{ "/articles/arduino-lchika/" | relative_url }})
