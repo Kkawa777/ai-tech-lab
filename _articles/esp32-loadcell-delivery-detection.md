@@ -7,13 +7,21 @@ category: 実践プロジェクト作品集
 difficulty: 中級
 estimated_time: 読了目安 約10分
 description: 荷物が届いても気づけなかった経験から、ロードセル×HX711×ESP32で配達物検知装置を自作した話です。通知の仕組み、ノイズとの戦い、今なら改善したい点まで実体験ベースで紹介します。
-tested_hardware: ESP32(具体的な型番は未確認)、ロードセル×4(型番未確認)、HX711(型番未確認)
+tested_hardware: "Freenove ESP32開発ボード(ASIN: B0C9THDPXP)、ロードセル×4+HX711セット(ASIN: B089LS556S)。具体的な配線・校正の詳細は当時の記録が残っておらず未確認"
 tested_software: 未確認(使用した開発環境・ライブラリの詳細は記録が残っていません)
-amazon_products: 該当なし(実使用品の型番が未確認のため、本記事では製品紹介を行いません)
-content_type: informational
+amazon_products: 本文中でB0C9THDPXP(Freenove ESP32開発ボード)とB089LS556S(ロードセル×4+HX711セット)を実使用品として紹介(2026年8月確認)
+content_type: commercial
 primary_keyword: ESP32 ロードセル 配達物検知
 search_intent: ESP32とロードセルを使って荷物の到着を自動検知・通知する仕組みを作りたい人が、実際の構成・つまずき・工夫を知りたい
-monetization: none
+monetization: amazon_affiliate
+conversion_goal: amazon_cta_click
+affiliate_products:
+  - asin: B0C9THDPXP
+    role: used
+    label: Freenove ESP32開発ボード
+  - asin: B089LS556S
+    role: used
+    label: ロードセル×4+HX711セット
 ---
 
 ## 「荷物が届いたのに気づかない」を解決したかった
@@ -49,9 +57,33 @@ monetization: none
 - **HX711(ロードセルが出す微小な信号を増幅し、デジタル信号に変換するモジュール)**
 - **ESP32(Wi-Fi通信機能を内蔵したマイコンボード)**
 
-ESP32を選んだ理由は、使用しやすかったことと、価格が安かったことの2点でした。
+### ESP32とは
 
-使用したロードセル・HX711の具体的な商品名や型番は、当時の記録が残っておらず特定できていません(未確認)。
+**ESP32**は、Wi-Fi・Bluetooth通信機能を内蔵したマイコン(チップ)の名称です。このチップを搭載した「ESP32開発ボード」を使うと、Arduino IDEなどの使い慣れた開発環境からプログラムを書き込み、Wi-Fi経由でクラウドやスマートフォンと連携する仕組みを作れます。第1号・第4号記事で使ったArduino UnoにはWi-Fi通信機能がなく、この点が大きな違いです。今回のように「検知した情報をLINEやメールへ通知する」ようなIoT的な用途では、ESP32のようなWi-Fi内蔵マイコンが向いています。
+
+### 今回使用したFreenove ESP32
+
+今回実際に使用したのは、**Freenove ESP32開発ボード**という製品です(Amazonでは2枚セットの「2-Pack」として販売されています)。これまでは具体的な商品名・型番が記録に残っておらず「未確認」としていましたが、Amazon購入履歴を確認したところ、実際に使用したのはこの製品(ASIN: B0C9THDPXP)であることが判明しました。このボードは、Freenoveの製品コードで「FNK0090」と呼ばれています。
+
+Freenoveの製品情報によると、このボードはESP32-WROOMモジュールを搭載し、**デュアルコア**(2つの処理装置が同時に動くため処理が速い構成)、32ビットで最大240MHzのマイコン、4MBの**フラッシュメモリ**(電源を切ってもプログラムを保存しておける記憶領域)、520KBの**SRAM**(電源が入っている間、計算のために一時的にデータを保持しておく作業用メモリ)、2.4GHz Wi-Fiと**Bluetooth 4.2(LE)**(消費電力を抑えたBluetooth通信規格)に対応しているとされています。MicroPython・Cのどちらでも開発でき、チュートリアルとサンプルプロジェクトが付属します。
+
+(参考: [Freenove ESP32 Board – store.freenove.com](https://store.freenove.com/products/fnk0090) 2026年8月確認)
+
+これは製品の一般的な仕様紹介であり、筆者の実使用感とは分けて記載しています。実際に使ってみた感想としては、**扱いやすく、価格も安かった**ため選びました。今作り直すとしても、引き続きこのFreenove ESP32を使いたいと感じています。
+
+{% include amazon-cta.html asin="B0C9THDPXP" label="今回使ったFreenove ESP32をAmazonで確認する" position="used-esp32" article="esp32-loadcell-delivery-detection" used=true %}
+
+### ロードセル・HX711とは
+
+**ロードセル**は、物の重さ(かかる力)を電気信号に変える部品です。内部の金属部分がわずかに変形することを利用して、重さの変化を電気抵抗の変化として検出します。ただし、ロードセル単体が出力する信号は非常に微小で、そのままではESP32のようなマイコンで扱えません。そこで**HX711**というモジュールを使い、ロードセルからの微小な信号を増幅し、マイコンが読み取れるデジタル信号に変換します。
+
+今回使用したのは、ロードセル4個とHX711モジュール1個がセットになった商品(ASIN: B089LS556S)です。商品ページによると、「ハーフブリッジ型」と呼ばれるタイプのロードセルで、2個を組み合わせることで1つの測定回路を構成する仕組みになっており、1個あたり最大50kgまで計測できるとされています。この「ロードセル4個+HX711」という組み合わせ自体は、この記事で説明してきた実際の構成と一致しています。
+
+(参考: Amazon.co.jp商品ページ 2026年8月確認)
+
+これも製品の一般的な仕様紹介であり、4個のロードセルをどのように組み合わせて配線したか、具体的な校正の手順については、当時の記録が残っておらず確認できていません(未確認)。
+
+{% include amazon-cta.html asin="B089LS556S" label="今回使ったロードセル＋HX711をAmazonで確認する" position="used-loadcell" article="esp32-loadcell-delivery-detection" used=true %}
 
 ## 重量から「配達物あり」を判定する仕組み
 
