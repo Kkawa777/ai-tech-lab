@@ -341,6 +341,28 @@ def check_order_values():
         ok("order-values", f"{len(files)} files")
 
 
+def check_drafts_excluded():
+    """`drafts/` must be in _config.yml's Jekyll `exclude:` list.
+
+    drafts/ is documented (docs/README.md, docs/devlog-policy.md) as a safe
+    holding area for non-ready content, on the assumption that Jekyll never
+    builds it. That assumption was silently false for a period (the
+    `- drafts/` exclude line existed only in an uncommitted local change),
+    which went unnoticed only because drafts/ was empty — the first real
+    file placed there was built and published live before anyone noticed.
+    This check makes that specific class of regression fail CI instead.
+    """
+    config_path = ROOT / "_config.yml"
+    if not config_path.exists():
+        fail("drafts-excluded", "_config.yml が見つかりません")
+        return
+    content = read(config_path)
+    if re.search(r"^\s*-\s*drafts/\s*$", content, re.MULTILINE):
+        ok("drafts-excluded")
+    else:
+        fail("drafts-excluded", "_config.yml の exclude: に `- drafts/` がありません(drafts/ が公開されるリスク)")
+
+
 def check_git_diff():
     result = subprocess.run(["git", "diff", "--check"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
@@ -353,6 +375,7 @@ def main():
     print("=== AI-Tech-Lab site validation ===\n")
     check_ready_status()
     check_order_values()
+    check_drafts_excluded()
     check_frontmatter_yaml()
     check_liquid_balance()
     check_images_exist_and_have_alt()
