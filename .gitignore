@@ -18,6 +18,10 @@ build/
 # Node (tooling, if used)
 node_modules/
 
+# Python (scripts/)
+__pycache__/
+*.pyc
+
 # Environment / secrets
 .env
 .env.local

@@ -77,7 +77,28 @@
 - [ ] GitHub Actions(Validate published articles / Jekyll build / deploy)が成功している
 - [ ] 公開後、実URLで表示・リンク・CTAを確認している
 
+## Dev Log Gate(`content_type: devlog`の記事のみ対象)
+
+`content_type: devlog`の記事は「実体験記事」ではないため、上記のインタビュー・事実性の
+項目群は適用しない(CLAUDE.mdの最重要ルールの適用除外)。詳細な設計・Factルール・
+Security/Privacyフィルタは[docs/devlog-policy.md](./devlog-policy.md)を正本とし、
+ここには複製しない。この節ではpublish前の最終チェックポイントのみ列挙する。
+
+- [ ] `source_project`が`config/devlog-projects.yaml`で`enabled: true`かつ`public: true`
+- [ ] `source_commits`に列挙されたcommitが、既存の`_articles/`・`drafts/`いずれの記事とも
+  重複していない(重複防止)
+- [ ] 本文がGitのcommit/変更ファイル/行数から確認できる事実(CONFIRMED_GIT_FACT)のみで
+  構成されており、体験・理由・感想を創作していない
+- [ ] 本文・frontmatterのいずれにも、secrets・API key・token・password・`.env`内容・
+  internal IP・個人情報・Windows固有の絶対パスが含まれていない
+- [ ] `_articles/`へは`status: ready`になった段階でのみ配置している(`drafts/`から昇格)
+- [ ] `order`が空欄でなく、devlog専用の予約レンジ`9<YYYYMMDD><連番2桁>`の整数値になっている
+  (`scripts/validate-site.py`の`check_order_values`が空欄・非整数を検出する)
+- [ ] `title`・`primary_keyword`が日本語の自然な検索クエリになるよう見直されている(機械生成の
+  ままだとcommit message由来の英語表記が残ることがある。書き換えなくても事実性は損なわれないが、
+  SEO上は推奨。詳細は`docs/devlog-policy.md`9節)
+
 ## 最終確認
 
-- [ ] 該当する実体験・コード・配線・製品情報の確認が完了している
+- [ ] 該当する実体験・コード・配線・製品情報の確認が完了している(Dev Logは上記Dev Log Gateで代替)
 - [ ] 上記すべてを満たした上でステータスを`ready`に変更してよい

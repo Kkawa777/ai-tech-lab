@@ -48,3 +48,4 @@ exclude:
   - ROADMAP.md
   - CONTENT_PLAN.md
   - LICENSE
+  - config/

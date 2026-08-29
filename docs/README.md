@@ -8,6 +8,7 @@
 
 - [PROJECT_PRINCIPLES.md](./PROJECT_PRINCIPLES.md) — CLAUDE.md / BRAND.md / ROADMAP.mdの原則索引
 - [publish-checklist.md](./publish-checklist.md) — 記事を`ready`にする前の最終チェックリスト
+- [devlog-policy.md](./devlog-policy.md) — `content_type: devlog`(Git履歴から自動生成する開発ログ)の設計・Factルール・allowlist・重複防止の正本
 - [TODO.md](./TODO.md) — 現在の開発状態(In Flight / Completed / Owner Action Required / Blocked / Next Up)。ログではなく都度上書きするHandoff Contractの一部
 - 記事執筆用テンプレートは [`templates/article-template.md`](../templates/article-template.md) が正本です(docs内には複製しません)
 

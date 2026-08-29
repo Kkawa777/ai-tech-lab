@@ -313,6 +313,34 @@ def check_image_dimensions_declared():
         ok("image-dimensions-declared", f"{checked} images")
 
 
+def check_order_values():
+    """_articles/*.md must all have a non-empty integer `order:` value.
+
+    index.md and articles/index.md both do `site.articles | sort: "order"`,
+    and Jekyll/Liquid's sort treats a missing/nil order as sorting first —
+    so a promoted article with a blank `order:` (e.g. a Dev Log draft moved
+    to _articles/ without filling this in) could silently become the site's
+    single "featured" article on the homepage (`| first`), displacing the
+    intended curated article. This check catches that before it ships.
+    """
+    articles_dir = ROOT / "_articles"
+    files = sorted(articles_dir.glob("*.md")) if articles_dir.exists() else []
+    bad = []
+    for f in files:
+        content = read(f)
+        fm, _ = split_frontmatter(content)
+        if fm is None:
+            bad.append(f"{f.name}: no frontmatter block found")
+            continue
+        m = re.search(r"^order:\s*(\S*)\s*$", fm, re.MULTILINE)
+        if not m or not m.group(1) or not re.match(r"^-?\d+$", m.group(1)):
+            bad.append(f"{f.name}: order is missing or not an integer")
+    if bad:
+        fail("order-values", "; ".join(bad))
+    else:
+        ok("order-values", f"{len(files)} files")
+
+
 def check_git_diff():
     result = subprocess.run(["git", "diff", "--check"], cwd=ROOT, capture_output=True, text=True)
     if result.returncode != 0:
@@ -324,6 +352,7 @@ def check_git_diff():
 def main():
     print("=== AI-Tech-Lab site validation ===\n")
     check_ready_status()
+    check_order_values()
     check_frontmatter_yaml()
     check_liquid_balance()
     check_images_exist_and_have_alt()

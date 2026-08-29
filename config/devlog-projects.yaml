@@ -1,0 +1,61 @@
+# devlog-projects.yaml
+#
+# Dev Log記事生成(scripts/generate-devlog.py)の対象projectを管理するallowlist。
+# 詳細な方針は docs/devlog-policy.md を参照(重複記載しない)。
+#
+# 運用ルール(deny-by-default):
+#   - ここに明示的に列挙され、かつ enabled: true かつ public: true のprojectのみ、
+#     Git履歴を読み取ってDev Log記事の生成対象にできる。
+#   - enabled: false または public: false のprojectは、--repo で直接パスを指定されても
+#     generate-devlog.py が処理を拒否する(ハードコードされたガード)。
+#   - path は、このリポジトリ(ai-tech-lab、C:\Projects)からの相対パスで書く。
+#     Windows固有の絶対パスをこのファイルに書かない(公開記事側に絶対パスが漏れることを防ぐため)。
+#   - --repo で渡された実際のパスの実体(realpath)と、ここで定義した path の実体が一致しない
+#     場合、generate-devlog.py は処理を拒否する(project名の詐称によるallowlistバイパス防止)。
+#
+# 新しいprojectを対象に追加する場合は、まず enabled: false / public: false で追加し、
+# そのrepository自体を公開してよいとオーナーが判断してから true に変更すること。
+
+projects:
+  ai-tech-lab:
+    path: "."
+    enabled: true
+    public: true
+    display_name: "AI-Tech-Lab"
+    notes: >-
+      このリポジトリ自身。唯一、現時点で公開Jekyllサイトとして運用されていることが
+      明確なproject。
+
+  # 以下は将来のsibling projectを追加する際のテンプレート例。パス・公開可否とも
+  # 未確認のため enabled/public とも false のままにしておく(公開可否が確認できない
+  # repositoryを勝手に有効化しない)。
+  ai-content-engine:
+    path: "ai-content-engine"
+    enabled: false
+    public: false
+    display_name: "ai-content-engine"
+    notes: "公開可否未確認。有効化する場合はオーナー判断が必要。"
+
+  global-trend-discovery:
+    path: "global-trend-discovery"
+    enabled: false
+    public: false
+    display_name: "global-trend-discovery"
+    notes: "公開可否未確認。有効化する場合はオーナー判断が必要。"
+
+  line-stock-news-bot:
+    path: "line-stock-news-bot"
+    enabled: false
+    public: false
+    display_name: "line-stock-news-bot"
+    notes: "公開可否未確認。有効化する場合はオーナー判断が必要。"
+
+  content-revenue-engine:
+    path: "content-revenue-engine"
+    enabled: false
+    public: false
+    display_name: "content-revenue-engine"
+    notes: >-
+      独立管理のrepository。CLAUDE.md(content-revenue-engine側)で
+      「親リポジトリ・sibling projectとは独立」と明記されており、このPoCでも変更禁止。
+      Dev Log対象化するかは別途オーナー判断が必要。
