@@ -42,6 +42,7 @@ exclude:
   - docs/
   - templates/
   - scripts/
+  - drafts/
   - README.md
   - CLAUDE.md
   - BRAND.md
