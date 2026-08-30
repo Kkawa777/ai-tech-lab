@@ -21,6 +21,31 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
 
 ## Completed
 
+- Dev Log自動生成 Phase 2(品質モデル・Sanitized Change Summary Layer・安全な自動公開能力)を実装。
+  新規: `scripts/devlogkit/`パッケージ(allowlist/gitmeta/security/sanitize/classify/score/ja/
+  templates/related/screenshots/observability/frontmatter/pipeline)、`scripts/promote-devlog.py`
+  (drafts/→_articles/昇格の唯一の経路。status/publish_decision/reviewer_status全部一致+
+  promotion時点の内容再スキャンPASSが必須)、`scripts/mark-devlog-reviewed.py`(`reviewer_status:
+  pass`を書ける唯一のスクリプト。generate側は絶対に自動設定しない)、`scripts/run-daily-devlog.py`
+  (複数project対応・1project失敗の分離)、`scripts/verify-build-output.py`(実際のJekyllビルド
+  出力`_site/`を検査し、`.github/workflows/pages.yml`のBuild直後に実行、drafts二重公開インシデントの
+  多層防御)、`scripts/test_devlog.py`(32テスト)。変更: `scripts/generate-devlog.py`
+  (devlogkit基盤に全面刷新、`--auto`モード追加)、`docs/devlog-policy.md`(Phase2章13-23節追加)、
+  `docs/publish-checklist.md`(Dev Log Gateへ3項目追加)、`.gitignore`(`_site/`・`devlog-logs/`追加)。
+  Sanitized Change Summary LayerはPhase1と異なりdiff内容を読むが、denylist→secret二重スキャンを
+  通過した安全な範囲(関数/クラス/テスト名・frontmatter除外済みdocs抜粋)のみ抽出。Quality Score
+  (5軸決定論的・0-100点)とSecurity/Privacy/Fact 3ゲート(最終テキスト独立再スキャン、1つでもFAILで
+  スコアに関係なくBLOCKED)を導入。independent-reviewerを3サイクル実施(1周目: BLOCKER0・MAJOR3
+  [YAML折り返し継続行のdocs_excerpts漏洩・promotion時の安全性再スキャン欠如・multi-project分離
+  テストが実コード非経由]を検出→全修正→2周目: BLOCKER0・MAJOR0確認)。実データPoCとして
+  `ai-tech-lab`自身の3日分(2026-08-06=57点SKIP、2026-08-22=67点DRAFT_ONLY、2026-08-23=既存
+  draftとのdedupでSKIP)で比較し、AUTO_PUBLISH_CANDIDATE(80点以上)はこの3日間では到達しなかった
+  ことを`docs/devlog-policy.md`に正直に記録。commit `aaf7f9b`(`feat: Dev Log Phase 2 - quality
+  scoring and safe auto-publish pipeline`)としてpush、GitHub Actions build/deploy成功
+  (新設の`Verify build output safety`ステップも実CI上でPASS)、本番確認(config/devlog-projects.yaml
+  非公開・devlogドラフト記事は非公開のまま・既存記事/ホームに影響なし)まで完了。実験生成した
+  draft(2026-08-22分)は昇格フロー自体のテストのみに使用し、テスト後に削除済み(`_articles/`への
+  新規公開は行っていない)
 - Claude Code開発基盤アップデート(Lead/Orchestrator・HANDOFF標準・Reusable Pattern Check)。
   既存構成(CLAUDE.md/quality-development/independent-reviewer/knowledge-management/
   parallel-worktree-development/停止条件)を壊さず3点のみ追加。変更: `CLAUDE.md`
@@ -33,7 +58,8 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
   handoff-format.md`(HANDOFFテンプレート+セッション内/永続ファイルの判断基準)。MASTER.mdは本repoに
   存在しないためCLAUDE.mdへ統合。independent-reviewer最終ゲート・Approval Gate(重大判断リスト)は
   非改変。過剰なAgent/Worktree並列化は未導入。independent-reviewer実施でBLOCKER0/MAJOR0/MINOR7
-  (正本一元化の表記ねじれ・用語揺れ・LOWリスク省略条項・体裁)→全7件反映済み。commit/pushはオーナー承認待ち
+  (正本一元化の表記ねじれ・用語揺れ・LOWリスク省略条項・体裁)→全7件反映済み。commit `70b5c97`
+  (`chore: add Lead/Orchestrator role, HANDOFF standard, and Reusable Pattern Check`)としてpush済み
 - **インシデント対応**: Dev Log PoC commit(`90a72d5`)のpush直後、`drafts/`配下のdraft記事
   (`devlog-ai-tech-lab-2026-08-23.md`)がGitHub Pages上で実際に公開されてしまう事故が発生
   (約3〜4分間、`https://.../articles/devlog-ai-tech-lab-2026-08-23/`がHTTP 200で応答)。
@@ -151,30 +177,34 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
    水検知センサー雨検知は`esp32-rain-sensor-detection.md`として存在)。正式な記事番号を追加する
    かどうかの判断が残る
 3. Dev Log PoCの`drafts/devlog-ai-tech-lab-2026-08-23.md`を実際に`_articles/`へ昇格(status:
-   ready化)して公開するかどうかの判断。機械的な要約レベルの内容のため、公開する場合はtitle/
-   primary_keywordの日本語化(docs/devlog-policy.md 9節)を推奨
+   ready化)して公開するかどうかの判断。Phase 2の`scripts/promote-devlog.py`
+   (+`scripts/mark-devlog-reviewed.py`)で昇格自体は可能になったが、機械的な要約レベルの内容の
+   ため、公開する場合はtitle/primary_keywordの日本語化(docs/devlog-policy.md 9節)を推奨
 4. Dev Logの対象project拡大(`ai-content-engine`/`global-trend-discovery`/
    `line-stock-news-bot`/`content-revenue-engine`を`config/devlog-projects.yaml`で
    `enabled: true`/`public: true`にするか)は、各repositoryを公開してよいというOwnerの
    明示判断が出るまで保留
-5. 命名規則の改善提案(要判断): `_articles/`のファイル名`0N-slug.md`は、01〜04号が偶然
+5. Dev Logの20:00毎日自動実行(`scripts/run-daily-devlog.py`)をGitHub Actions cronまたは
+   Windows Task Schedulerへ実際に登録するかどうかの判断(Phase 2ではrunner自体は実装済みだが、
+   スケジューラへの登録は意図的に見送っている)
+6. 命名規則の改善提案(要判断): `_articles/`のファイル名`0N-slug.md`は、01〜04号が偶然
    CONTENT_PLAN.mdのカテゴリA番号と一致していたために「公開順」と「CONTENT_PLAN上のカタログID」が
    同じ意味であるかのように見えていたが、実際には別の名前空間。第5号(配達物検知)で両者が衝突した
    ため、今回はファイル名から数字プレフィックスを落として回避した。今後もカテゴリを跨ぐ記事(実践
    プロジェクト作品集等)が増える見込みのため、`order:`frontmatterを公開順のSoTとし、ファイル名は
    常にslugのみ(数字プレフィックスなし)に統一する運用への変更を提案する。既存の01〜04は
    大規模renumberを避けるためそのまま維持し、今後の新規ファイルにのみ適用する案
-6. `privacy.md`の「運営者・お問い合わせ」章はGitHub Issuesリンクで暫定対応した。専用の問い合わせ
+7. `privacy.md`の「運営者・お問い合わせ」章はGitHub Issuesリンクで暫定対応した。専用の問い合わせ
    手段(メールアドレス等)を今後用意する場合は、この章の更新を検討
-7. `MEASUREMENT REQUIRED`: 下記「計測 TODO」を参照
-8. 第4号本文中に、既公開の第3号記事への同種の前方参照debtが残存(`_articles/01-arduino-toha-
+8. `MEASUREMENT REQUIRED`: 下記「計測 TODO」を参照
+9. 第4号本文中に、既公開の第3号記事への同種の前方参照debtが残存(`_articles/01-arduino-toha-
    hajimekata.md`の69行目・102行目、「別記事「Arduinoスターターキットの選び方」で扱う予定です」
    →実リンク化されていない)。今回の第4号公開diffの対象外だったため見送ったが、次回の軽微な
    修正機会に「第3号記事「...」」+リンクの形式へ統一することを推奨(independent-reviewer指摘)
-9. ESP32-CAM監視の続編記事(下記候補)で配線図・コードを扱う場合は、電源仕様など
-   安全上の注意点を必ず含めること(第5号は配線図・コードを意図的に割愛したため今回は問題なし、
-   independent-reviewer指摘)
-10. `B09XMPPZYT`(USBシリアル変換器、第6号記事対象)が実際に購入した商品と同一か、オーナーに確認が
+10. ESP32-CAM監視の続編記事(下記候補)で配線図・コードを扱う場合は、電源仕様など
+    安全上の注意点を必ず含めること(第5号は配線図・コードを意図的に割愛したため今回は問題なし、
+    independent-reviewer指摘)
+11. `B09XMPPZYT`(USBシリアル変換器、第6号記事対象)が実際に購入した商品と同一か、オーナーに確認が
     必要(`B089LS556S`・`B0C9THDPXP`は2026年8月のAffiliate Sprintで確認済み・CTA実装済みのため、
     このリストからは除外した。詳細は下記「Affiliate ASIN管理」および「第5号 Affiliate実装済み内容」参照)
 
@@ -192,7 +222,7 @@ CAM Dev Board Kit(ASIN `B0CJJHXD1W`)**であることをOwner本人が確認し�
 | `B0CJJHXD1W` | Freenove ESP32 CAM Dev Board Kit | **実使用品(Owner確認済み)** | 第6号 | **CTA実装済み**(`used=true`) |
 | `B089LS556S` | ロードセル×4+HX711セット | **実使用品(Owner確認済み)** | 第5号 | **CTA実装済み**(`used=true`) |
 | `B0C9THDPXP` | Freenove ESP32開発ボード | **実使用品(Owner確認済み)** | 第5号 | **CTA実装済み**(`used=true`) |
-| `B09XMPPZYT` | USBシリアル変換器 | 実使用候補(確認待ち、用途不明) | 第6号 | Owner確認待ち(#10、CTA追加せず) |
+| `B09XMPPZYT` | USBシリアル変換器 | 実使用候補(確認待ち、用途不明) | 第6号 | Owner確認待ち(#11、CTA追加せず) |
 | `B07PVRWDSW` | 水検知センサー | **実使用品(Owner確認済み)** | 第7号 | **CTA実装済み**(`used=true`) |
 | `B0FT818HCH` | 3Dプリンター | future-article | 3Dプリンター関連記事(未執筆。第5号・第6号の「今なら」将来案は言及のみで実使用ではない) | 実体験との一致確認後に利用 |
 
@@ -213,7 +243,7 @@ CAM Dev Board Kit(ASIN `B0CJJHXD1W`)**であることをOwner本人が確認し�
   文言「今回使ったESP32 CAMをAmazonで確認する」、`used=true`、
   `position="used-esp32-cam"` `article="esp32-cam-delivery-monitoring"`
 - USBシリアル変換器(`B09XMPPZYT`)は、Freenove製品仕様上USB内蔵書き込みに対応しているため、
-  Owner実体験(当時使用した記憶)との関係が未確認。CTAは追加していない(#10参照)
+  Owner実体験(当時使用した記憶)との関係が未確認。CTAは追加していない(#11参照)
 - 本文中、「AI-Thinker」への言及は「一般的なESP32-CAMの代表例」および「記憶違いの経緯説明」の
   2箇所のみ残し、実使用品としての記載はすべてFreenoveへ訂正済み
 
@@ -246,7 +276,7 @@ CAM Dev Board Kit(ASIN `B0CJJHXD1W`)**であることをOwner本人が確認し�
     確認できた場合のみ)
   - data属性: `position="used-usb-serial"` `article="esp32-cam-delivery-monitoring"`
   - 用途不明のまま`used=true`でCTA化すると実体験を都合よく解釈することになるため、
-    Owner確認(#10)が完了するまで実装しない
+    Owner確認(#11)が完了するまで実装しない
 
 ### amazon_click(GA4)確認
 
@@ -261,7 +291,7 @@ CAM Dev Board Kit(ASIN `B0CJJHXD1W`)**であることをOwner本人が確認し�
    (`B0CJJHXD1W`、`used=true`)、第5号のFreenove ESP32開発ボード(`B0C9THDPXP`、`used=true`)・
    ロードセル×4+HX711セット(`B089LS556S`、`used=true`)
 2. **実使用品+ASIN不明/確認待ち → Owner Action**: 第6号(USBシリアル変換器`B09XMPPZYT`)。
-   上記「Owner Action Required」#10参照
+   上記「Owner Action Required」#11参照
 3. **未使用/候補 → 無理にCTAを入れない**:
    - 第1号: 具体的な商品名・型番を本文で「未確認」と明記しており、紹介可能な実使用品がそもそもない
    - 第2号: ソフトウェアインストール記事のため対象製品なし
@@ -406,7 +436,7 @@ commit `8650da5`(収益化Sprint、2026-08-20 deploy)以降のデータが十分
   次第、上記「第5号 画像TODO」に沿って本文へ反映(A〜D未着手)
 - ESP32-CAM記事は公開済み。eyecatch・システム構成概念図(当時)・実機写真・撮影画像が届き次第、
   上記「第6号(ESP32-CAM) 画像設計ブリーフ」に沿って本文へ反映(A〜Dとも未着手)。Amazon ASIN
-  確認(Owner Action Required #10)は次のAffiliate Sprintで検討
+  確認(Owner Action Required #11)は次のAffiliate Sprintで検討
 - 第7号(水検知センサー雨検知)記事は公開済み。eyecatch・システム構成概念図・実機写真・センサー/
   設置状態写真・3Dプリンターケース写真が届き次第、下記「第7号 画像TODO」に沿って本文へ反映
   (未着手)。正確な配線図が必要な場合はFritzing/SVG等で別途作成する方針(未確認の配線は画像化しない)
