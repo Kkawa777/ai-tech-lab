@@ -15,6 +15,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from devlogkit.frontmatter import split_frontmatter  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 FAILURES = []
 WARNINGS = []
@@ -34,13 +37,6 @@ def ok(check, msg=""):
 
 def read(path):
     return path.read_text(encoding="utf-8")
-
-
-def split_frontmatter(text):
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return None, text
-    return parts[1], parts[2]
 
 
 def check_ready_status():

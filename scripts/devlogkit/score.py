@@ -41,6 +41,32 @@ PRIVACY_LEAK_PATTERNS = [
 ]
 
 
+# --- Score axis ownership (Phase 2.5 audit, docs/devlog-policy.md Step 8) ---
+#
+# Each underlying signal is scored on ONLY ONE axis for the property that
+# axis is meant to measure, to avoid the same fact inflating the total via
+# multiple axes. Phase 2's original design had functions/classes presence
+# counted in development_value AND reader_value AND technical_depth (the
+# same boolean, three times) — this table is the audited replacement:
+#
+#   signal                  -> axis (what it says about that axis)
+#   commit count / line count  -> Development Value (size of the change)
+#   config_keys_changed         -> Development Value (a real config action)
+#   docs_excerpts                -> Reader Value (a reader gets real prose)
+#   headings_added                -> Reader Value (new sections a reader sees)
+#   tests_added                    -> Reader Value (reassurance) AND
+#                                     Technical Depth (engineering rigor) —
+#                                     the one deliberate exception, because
+#                                     "a test was added" genuinely supports
+#                                     two different claims, not one fact
+#                                     counted twice toward one claim
+#   functions_added/classes_added -> Technical Depth only
+#   behavior_pairs (before/after)  -> Technical Depth only
+#   evidence count / diversity      -> Evidence Strength (how much
+#                                       CONFIRMED_GIT_FACT exists at all)
+#   day_type / title coverage        -> SEO Potential
+
+
 def score_development_value(day_stats, summary):
     score = 0
     score += min(8, day_stats["notable_commit_count"] * 3)
@@ -51,7 +77,7 @@ def score_development_value(day_stats, summary):
         score += 5
     elif total_lines >= 10:
         score += 2
-    if summary["functions_added"] or summary["classes_added"]:
+    if summary.get("config_keys_changed"):
         score += 4
     return min(20, score)
 
@@ -60,18 +86,31 @@ def score_reader_value(summary):
     score = 0
     if summary["docs_excerpts"]:
         score += 8
-    if summary["tests_added"]:
+    if summary.get("headings_added"):
         score += 6
-    if summary["functions_added"] or summary["classes_added"]:
+    if summary["tests_added"]:
         score += 6
     return min(20, score)
 
 
+EVIDENCE_TYPE_SUFFIXES = (
+    "function signature added", "class signature added", "test added",
+    "docs/README prose excerpt", "heading added", "frontmatter key added",
+    "single-line before/after",
+)
+
+
 def score_evidence_strength(summary, day_stats):
     score = 4  # baseline: commit hash/subject/date are always CONFIRMED_GIT_FACT
-    score += min(10, len(summary["evidence"]) * 2)
-    if summary["behavior_pairs"]:
-        score += 6
+    score += min(8, len(summary["evidence"]) * 2)
+    # Diversity bonus: rewards having SEVERAL DIFFERENT kinds of extracted
+    # evidence (not just many of the same kind — e.g. ten docs_excerpts
+    # from ten files scores the same diversity as one, since Phase 2.5's
+    # audit specifically flagged "file count alone shouldn't inflate the
+    # score"). Replaces Phase 2's behavior_pairs-specific bonus here (that
+    # signal now belongs solely to Technical Depth, see the table above).
+    distinct_types = {suffix for suffix in EVIDENCE_TYPE_SUFFIXES if any(suffix in e for e in summary["evidence"])}
+    score += min(8, len(distinct_types) * 2)
     total_files = max(1, day_stats.get("total_files_changed", 0))
     skip_ratio = len(summary["files_skipped_for_safety"]) / total_files
     if skip_ratio > 0.5:
@@ -80,17 +119,28 @@ def score_evidence_strength(summary, day_stats):
 
 
 def score_technical_depth(summary):
+    # config_keys_changed deliberately does NOT appear here (self-audit
+    # finding during Phase 2.5 review): a frontmatter key being added is
+    # already credited once, on Development Value, as "a real config
+    # action" — counting the same boolean again here would dilute what
+    # Technical Depth is meant to measure (functions/classes/tests/before-
+    # after evidence are genuine code-level signals; a config key by
+    # itself is shallower than that and doesn't belong alongside them).
     signal_types_present = sum([
         bool(summary["functions_added"]),
         bool(summary["classes_added"]),
         bool(summary["tests_added"]),
-        bool(summary["docs_excerpts"]),
         bool(summary["behavior_pairs"]),
     ])
     return min(20, signal_types_present * 5)
 
 
 def score_seo_potential(day_type, ja_coverage_ratio):
+    # Deliberately NOT a per-keyword count (Phase 2.5 audit item: "SEO
+    # Potentialがkeyword個数ゲームになっていない") — only two coarse,
+    # non-stackable signals: whether a concrete theme/type was identified
+    # at all, and how much of the title could be rendered in natural
+    # Japanese. Neither can be inflated by adding more of anything.
     score = 0
     if day_type != GENERIC:
         score += 10

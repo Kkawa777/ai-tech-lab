@@ -53,6 +53,14 @@ VERB_MAP = {
     "strengthen": "強化しました",
     "establish": "整備しました",
     "configure": "設定しました",
+    # Added for Phase 2.5 (docs/devlog-policy.md Step 5): frequent verbs
+    # observed in this repo's own commit history that were previously
+    # unmapped, falling straight through to the Phase 1 verbatim fallback.
+    "prevent": "防止しました", "validate": "検証しました", "detect": "検知しました",
+    "generate": "生成しました", "compare": "比較しました", "select": "選択しました",
+    "retry": "再試行しました", "isolate": "分離しました", "promote": "昇格しました",
+    "exclude": "除外しました", "resolve": "解決しました",
+    "enable": "有効化しました", "disable": "無効化しました",
 }
 
 # Generic single-token fallback dictionary. Unmapped tokens are left
@@ -86,6 +94,16 @@ JA_TERM_MAP = {
     "install": "インストール", "installation": "インストール",
     "documentation": "ドキュメント", "docs": "ドキュメント", "doc": "ドキュメント",
     "structure": "構造", "template": "テンプレート", "templates": "テンプレート",
+    # Added for Phase 2.5: recurring nouns from this repo's own Dev Log
+    # development (a legitimately recurring topic for this project, not
+    # arbitrary padding — see docs/devlog-policy.md Step 5's category list).
+    "validation": "検証", "pipeline": "パイプライン", "draft": "ドラフト",
+    "comparison": "比較", "gate": "ゲート", "score": "スコア",
+    "promotion": "昇格", "hash": "ハッシュ", "fingerprint": "フィンガープリント",
+    "reviewer": "レビュー", "evidence": "根拠", "summary": "サマリー",
+    "safety": "安全性", "runner": "ランナー", "daily": "日次",
+    "roi": "ROI", "poc": "PoC", "git": "Git", "history": "履歴",
+    "presentation": "プレゼンテーション", "version": "バージョン",
 }
 
 
@@ -99,13 +117,27 @@ def _apply_multi_word_overrides(subject_lower):
     return remaining, translated_fragments
 
 
+# A Japanese compound noun chain reads naturally for roughly 2-4 concepts
+# (e.g. "収益化分析基盤" = monetization + analytics + foundation). Beyond
+# that, concatenating more mapped words does NOT compose into a readable
+# phrase — it produces a run-on word-salad even at 100% dictionary
+# coverage (Phase 2.5 finding: "add Dev Log automation PoC (Git history ->
+# article draft)" has 8 meaningful tokens and produced
+# "devログ自動化pocgithistory記事draft", which is unreadable regardless of
+# how much the dictionary is expanded). So token-count is capped
+# independently of coverage, not just used as a fallback signal.
+MAX_TRANSLATABLE_TOKENS = 5
+
+
 def translate_subject(cleaned_subject):
-    """Returns (japanese_ish_title_fragment, coverage_ratio).
+    """Returns (japanese_ish_title_fragment, coverage_ratio, token_count).
 
     coverage_ratio in [0, 1]: fraction of tokens that were either mapped
-    via the dictionary or matched a multi-word override. A low ratio means
-    "mostly untranslated" — callers should treat that as a signal to fall
-    back to a more conservative rendering rather than trust this output.
+    via the dictionary or matched a multi-word override. token_count is
+    the number of meaningful tokens (verb + stopwords already excluded)
+    the object phrase was built from. Both are needed by
+    coverage_is_usable() — a low ratio OR too many tokens are each
+    independently a sign this output shouldn't be trusted as-is.
     """
     lowered = cleaned_subject.lower()
     remaining, ja_fragments = _apply_multi_word_overrides(lowered)
@@ -113,7 +145,7 @@ def translate_subject(cleaned_subject):
     raw_tokens = re.findall(r"[a-z0-9]+|__ja_\d+__", remaining)
     tokens = [t for t in raw_tokens if t not in STOPWORDS]
     if not tokens:
-        return cleaned_subject, 0.0
+        return cleaned_subject, 0.0, 0
 
     verb = None
     if tokens[0] in VERB_MAP:
@@ -139,13 +171,17 @@ def translate_subject(cleaned_subject):
     object_phrase = "".join(object_parts)
 
     if verb:
-        return f"{object_phrase}を{verb}", coverage
-    return object_phrase, coverage
+        return f"{object_phrase}を{verb}", coverage, len(tokens)
+    return object_phrase, coverage, len(tokens)
 
 
-def coverage_is_usable(coverage_ratio, min_tokens=1):
-    """Below this coverage, a translated phrase tends to read as a
-    disjointed word-salad rather than a sentence — better to fall back to
-    the Phase 1 verbatim-English style (still factual, just less natural)
-    than to publish something that looks broken."""
-    return coverage_ratio >= 0.34
+def coverage_is_usable(coverage_ratio, token_count=0):
+    """Below this coverage, or beyond MAX_TRANSLATABLE_TOKENS concepts, a
+    translated phrase tends to read as a disjointed word-salad rather than
+    a sentence — better to fall back to the Phase 1 verbatim-English style
+    (still factual, just less natural) than to publish something that
+    looks broken. Raised from 0.34 to 0.6 in Phase 2.5 after finding 0.34
+    let through partially-translated phrases that still read as broken
+    (e.g. "0ESP32cam記事を追加しました" at ~0.5 coverage was borderline
+    acceptable, but lower ratios were not)."""
+    return coverage_ratio >= 0.6 and token_count <= MAX_TRANSLATABLE_TOKENS

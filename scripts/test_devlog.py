@@ -26,6 +26,22 @@ from devlogkit import pipeline  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _real_commit_hashes(n=2):
+    """N real, currently-existing commit hashes from this repo's own Git
+    history — used so promotion-gate fixtures satisfy the Phase 2.5 Fact
+    Gate (source_commits must resolve to real commits) without hardcoding
+    hashes that could stop existing in a shallow clone or after history
+    rewrites."""
+    import subprocess
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "log", "--format=%H", f"-n{n}"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    hashes = result.stdout.strip().splitlines()
+    assert len(hashes) >= n, "this repo needs at least n commits for promotion-gate fixtures"
+    return hashes
+
+
 def _load_script_module(name):
     """scripts/run-daily-devlog.py etc. have hyphens, so they can't be
     imported with a normal `import` statement — load by file path instead.
@@ -234,14 +250,19 @@ class TestPromotionGate(unittest.TestCase):
             if p.exists():
                 p.unlink()
 
-    def _write_fixture(self, reviewer_status, publish_decision="DRAFT_ONLY"):
+    def _write_fixture(self, reviewer_status, publish_decision="DRAFT_ONLY", body="body"):
         from devlogkit import frontmatter as fm_lib
         fm = {
             "title": "test", "status": "draft", "permalink": "/articles/__test__/",
             "order": None, "content_type": "devlog", "development_date": "2026-01-01",
-            "publish_decision": publish_decision, "reviewer_status": reviewer_status,
+            "publish_decision": publish_decision, "reviewer_status": "pending",
+            "generated_from_git": True, "source_project": "ai-tech-lab",
+            "source_commits": _real_commit_hashes(1),
         }
-        self.tmp_draft.write_text(fm_lib.render_markdown(fm, "body"), encoding="utf-8")
+        self.tmp_draft.write_text(fm_lib.render_markdown(fm, body), encoding="utf-8")
+        if reviewer_status == "pass":
+            result = self._run_mark_reviewed(["--pass", "--method", "test"])
+            assert result.returncode == 0, f"test setup failed to mark reviewed: {result.stderr}"
 
     def test_promotion_rejected_when_reviewer_pending(self):
         self._write_fixture(reviewer_status="pending")
@@ -256,6 +277,21 @@ class TestPromotionGate(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(self.tmp_article.exists())
 
+    def test_promotion_rejected_without_recorded_hash(self):
+        """A draft with reviewer_status: pass set by hand (not via
+        mark-devlog-reviewed.py, so it has no reviewed_content_hash) must
+        still be rejected — reviewer_status alone is not sufficient."""
+        from devlogkit import frontmatter as fm_lib
+        fm = {
+            "title": "test", "status": "draft", "permalink": "/articles/__test__/",
+            "order": None, "content_type": "devlog", "development_date": "2026-01-01",
+            "publish_decision": "DRAFT_ONLY", "reviewer_status": "pass",
+        }
+        self.tmp_draft.write_text(fm_lib.render_markdown(fm, "body"), encoding="utf-8")
+        result = self._run_promote()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.tmp_article.exists())
+
     def test_promotion_succeeds_when_reviewed_and_decided(self):
         self._write_fixture(reviewer_status="pass", publish_decision="DRAFT_ONLY")
         result = self._run_promote()
@@ -263,10 +299,166 @@ class TestPromotionGate(unittest.TestCase):
         self.assertFalse(self.tmp_draft.exists())
         self.assertTrue(self.tmp_article.exists())
 
+    def test_promotion_rejected_when_source_commit_does_not_exist(self):
+        """Fact Gate (Phase 2.5 Step 9): even a fully-reviewed, fingerprint-
+        matching draft must be rejected if source_commits references a hash
+        that doesn't actually exist in the project's Git history — an
+        independent review found this was previously never checked at all,
+        so a hand-crafted or corrupted draft with fabricated commit hashes
+        could otherwise be promoted as if it were genuinely Git-derived."""
+        from devlogkit import frontmatter as fm_lib
+        fm = {
+            "title": "test", "status": "draft", "permalink": "/articles/__test__/",
+            "order": None, "content_type": "devlog", "development_date": "2026-01-01",
+            "publish_decision": "DRAFT_ONLY", "reviewer_status": "pending",
+            "generated_from_git": True, "source_project": "ai-tech-lab",
+            "source_commits": ["0000000000000000000000000000000000dead"],
+        }
+        self.tmp_draft.write_text(fm_lib.render_markdown(fm, "body"), encoding="utf-8")
+        result = self._run_mark_reviewed(["--pass", "--method", "test"])
+        assert result.returncode == 0, f"test setup failed to mark reviewed: {result.stderr}"
+        result = self._run_promote()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.tmp_article.exists())
+        self.assertIn("Fact Gate", result.stderr)
+
+    def test_promotion_rejected_when_source_commit_is_a_symbolic_ref(self):
+        """Fact Gate hash-shape check (iteration-2 review finding): `git
+        cat-file -e <ref>^{commit}` happily resolves symbolic refs like
+        "HEAD" or a branch name too, not just literal commit hashes — so
+        without an explicit hex-shape check, `source_commits: ["HEAD"]`
+        would pass the existence check in any repo with commits at all,
+        despite naming no specific, verifiable commit."""
+        from devlogkit import frontmatter as fm_lib
+        fm = {
+            "title": "test", "status": "draft", "permalink": "/articles/__test__/",
+            "order": None, "content_type": "devlog", "development_date": "2026-01-01",
+            "publish_decision": "DRAFT_ONLY", "reviewer_status": "pending",
+            "generated_from_git": True, "source_project": "ai-tech-lab",
+            "source_commits": ["HEAD"],
+        }
+        self.tmp_draft.write_text(fm_lib.render_markdown(fm, "body"), encoding="utf-8")
+        result = self._run_mark_reviewed(["--pass", "--method", "test"])
+        assert result.returncode == 0, f"test setup failed to mark reviewed: {result.stderr}"
+        result = self._run_promote()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.tmp_article.exists())
+        self.assertIn("Fact Gate", result.stderr)
+
     def _run_promote(self):
         import subprocess
         return subprocess.run(
             [sys.executable, str(REPO_ROOT / "scripts" / "promote-devlog.py"), str(self.tmp_draft)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+
+    def _run_mark_reviewed(self, extra_args):
+        import subprocess
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "mark-devlog-reviewed.py"), str(self.tmp_draft)] + extra_args,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+
+
+class TestContentFingerprintTamperDetection(unittest.TestCase):
+    """Step 18 (docs/devlog-policy.md): a draft reviewed via
+    mark-devlog-reviewed.py --pass must become UN-promotable the moment
+    ANYTHING changes afterward — one character in the body, an added
+    paragraph, a frontmatter field, or the source_commits list. Each
+    sub-test tampers with a genuinely-reviewed fixture in one specific
+    way and confirms promote-devlog.py refuses."""
+
+    def setUp(self):
+        self.tmp_draft = REPO_ROOT / "drafts" / "__test_tamper_detection__.md"
+        self.tmp_article = REPO_ROOT / "_articles" / "__test_tamper_detection__.md"
+
+    def tearDown(self):
+        for p in (self.tmp_draft, self.tmp_article):
+            if p.exists():
+                p.unlink()
+
+    def _write_and_review_fixture(self):
+        from devlogkit import frontmatter as fm_lib
+        fm = {
+            "title": "test article", "status": "draft", "permalink": "/articles/__test__/",
+            "order": None, "content_type": "devlog", "development_date": "2026-01-01",
+            "publish_decision": "DRAFT_ONLY", "reviewer_status": "pending",
+            "generated_from_git": True, "source_project": "ai-tech-lab",
+            "source_commits": _real_commit_hashes(2),
+        }
+        self.tmp_draft.write_text(fm_lib.render_markdown(fm, "This is the reviewed body text."), encoding="utf-8")
+        result = self._run_mark_reviewed()
+        assert result.returncode == 0, f"test setup failed: {result.stderr}"
+
+    def _tamper_and_assert_promotion_rejected(self, mutate_fn):
+        from devlogkit import frontmatter as fm_lib
+        fm, body = fm_lib.read_frontmatter(self.tmp_draft)
+        fm, body = mutate_fn(fm, body)
+        self.tmp_draft.write_text(fm_lib.render_markdown(fm, body), encoding="utf-8")
+        result = self._run_promote()
+        self.assertNotEqual(result.returncode, 0, "promotion must be rejected after tampering")
+        self.assertFalse(self.tmp_article.exists())
+
+    def test_one_character_body_change_is_detected(self):
+        self._write_and_review_fixture()
+        self._tamper_and_assert_promotion_rejected(lambda fm, body: (fm, body + "."))
+
+    def test_added_paragraph_is_detected(self):
+        self._write_and_review_fixture()
+        self._tamper_and_assert_promotion_rejected(
+            lambda fm, body: (fm, body + "\n\nユーザーから要望があったため実装しました。")
+        )
+
+    def test_frontmatter_field_change_is_detected(self):
+        self._write_and_review_fixture()
+
+        def mutate(fm, body):
+            fm["title"] = "a different title"
+            return fm, body
+
+        self._tamper_and_assert_promotion_rejected(mutate)
+
+    def test_source_commits_change_is_detected(self):
+        self._write_and_review_fixture()
+
+        def mutate(fm, body):
+            fm["source_commits"] = ["abc1234"]  # dropped one commit
+            return fm, body
+
+        self._tamper_and_assert_promotion_rejected(mutate)
+
+    def test_publish_decision_upgrade_is_detected(self):
+        """An adversarial edit trying to upgrade SKIP/BLOCKED to a
+        promotable decision after the fact must also be caught — the
+        fingerprint locks publish_decision too, not just prose content."""
+        self._write_and_review_fixture()
+
+        def mutate(fm, body):
+            fm["publish_decision"] = "AUTO_PUBLISH_CANDIDATE"
+            return fm, body
+
+        self._tamper_and_assert_promotion_rejected(mutate)
+
+    def test_unmodified_reviewed_draft_still_promotes(self):
+        """Sanity check: the tamper-detection tests above aren't just
+        failing promotion unconditionally — an untouched, genuinely
+        reviewed draft must still succeed."""
+        self._write_and_review_fixture()
+        result = self._run_promote()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.tmp_article.exists())
+
+    def _run_promote(self):
+        import subprocess
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "promote-devlog.py"), str(self.tmp_draft)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+
+    def _run_mark_reviewed(self):
+        import subprocess
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "mark-devlog-reviewed.py"), str(self.tmp_draft), "--pass", "--method", "test"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
 
@@ -399,6 +591,65 @@ class TestFrontmatterLeakPrevention(unittest.TestCase):
         self.assertIsNone(sanitize._frontmatter_line_range("Just a plain markdown file.\n"))
 
 
+class TestPlanningLabelAndHeadingRename(unittest.TestCase):
+    """Regression tests for two article-quality bugs an independent review
+    found in a real generated Dev Log: (1) an internal editorial-planning
+    label ("検索意図:", from CONTENT_PLAN.md-style content-planning docs)
+    leaking into a "docs excerpt" as if it were reader-facing documentation
+    prose; (2) a heading-LEVEL-only rename (e.g. "# X" -> "## X") being
+    reported as both a newly "added heading" AND a "before/after" change,
+    contradicting itself in the rendered article."""
+
+    def test_internal_planning_label_excluded_from_docs_excerpt(self):
+        lines = [
+            "@@ -10,0 +11,2 @@",
+            "+2. **Some future article title**",
+            "+   検索意図: this is internal SEO planning metadata, not documentation.",
+        ]
+        excerpt = sanitize._extract_docs_excerpt(lines)
+        self.assertIsNotNone(excerpt)
+        self.assertNotIn("検索意図", excerpt)
+        self.assertNotIn("SEO planning metadata", excerpt)
+
+    def test_heading_level_only_rename_is_not_reported_as_added(self):
+        lines = [
+            "@@ -5 +5 @@",
+            "-# この記事でわかること",
+            "+## この記事でわかること",
+        ]
+        headings = sanitize._extract_headings(lines)
+        self.assertNotIn("この記事でわかること", headings)
+
+    def test_genuinely_new_heading_is_still_reported(self):
+        lines = [
+            "@@ -0,0 +1,2 @@",
+            "+## A brand new section",
+            "+some body text",
+        ]
+        headings = sanitize._extract_headings(lines)
+        self.assertIn("A brand new section", headings)
+
+
+class TestFrontmatterSplitRobustness(unittest.TestCase):
+    """Regression test for a bug an independent code review found in
+    frontmatter.split_frontmatter: the earlier implementation split on the
+    literal 3-character substring "---" anywhere in the text, so a
+    frontmatter VALUE that happens to contain "---" (e.g. a commit subject
+    like "docs: replace === with --- style" embedded verbatim by ja.py's
+    English-fallback path) would be mis-split mid-value instead of at the
+    real `--- ... ---` delimiter lines."""
+
+    def test_dashes_inside_a_value_do_not_break_the_split(self):
+        import yaml
+        fm = {"title": "docs: replace === with --- style", "status": "draft"}
+        rendered = fm_lib.render_markdown(fm, "The body.")
+        fm_text, body = fm_lib.split_frontmatter(rendered)
+        self.assertIsNotNone(fm_text)
+        parsed_fm = yaml.safe_load(fm_text)
+        self.assertEqual(parsed_fm["title"], "docs: replace === with --- style")
+        self.assertEqual(body.strip(), "The body.")
+
+
 class TestPromotionTimeSafetyRescan(unittest.TestCase):
     """MAJOR-2 fix: promote-devlog.py and mark-devlog-reviewed.py must
     re-scan the file's CURRENT content for Security/Privacy leaks, not
@@ -437,12 +688,22 @@ class TestPromotionTimeSafetyRescan(unittest.TestCase):
 
     def test_promote_rejected_if_windows_path_present_despite_pass(self):
         import subprocess
-        # Simulate: generation-time gates passed and a human marked it
-        # reviewed, but the file was edited afterward to include a local
-        # path (e.g. copy-pasted from a terminal) before promotion ran.
-        self._write_fixture("some text mentioning C:\\Users\\jsmith\\notes\\draft.txt")
+        # Simulate: the draft was clean and genuinely reviewed (hash
+        # recorded on clean content), but was THEN edited to include a
+        # local path (e.g. copy-pasted from a terminal) before promotion
+        # ran. The content-fingerprint check (Phase 2.5) would already
+        # catch this on its own, but the Privacy gate re-scan is kept as
+        # independent defense in depth — this test confirms promotion is
+        # rejected either way, not that one specific mechanism fired.
+        self._write_fixture("clean body with nothing sensitive in it")
+        mark_result = subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "mark-devlog-reviewed.py"), str(self.tmp_draft), "--pass", "--method", "test"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+        assert mark_result.returncode == 0, mark_result.stderr
+
         fm, body = fm_lib.read_frontmatter(self.tmp_draft)
-        fm["reviewer_status"] = "pass"
+        body += " some text mentioning C:\\Users\\jsmith\\notes\\draft.txt"
         self.tmp_draft.write_text(fm_lib.render_markdown(fm, body), encoding="utf-8")
 
         result = subprocess.run(

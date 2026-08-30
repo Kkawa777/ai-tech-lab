@@ -21,6 +21,40 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
 
 ## Completed
 
+- Dev Log自動化 Phase 2.5(Auto-Publish Readiness Sprint)完了。目的: 「Gitから生成した
+  記事が人の手直しなしで公開候補になる」ことを実データで証明する(閾値80点は変更禁止)。
+  変更: `scripts/devlogkit/`の`sanitize.py`(見出し/設定キー/README抜粋の抽出・帰属を
+  拡張、内部SEOラベル`検索意図:`等の漏洩除外、見出しレベル変更の二重計上防止)、
+  `score.py`(`config_keys_changed`のDevelopment Value/Technical Depth二重加点を監査・
+  修正)、`classify.py`(UI判定を過半数厳格化`>`)、`ja.py`(辞書拡張・
+  `MAX_TRANSLATABLE_TOKENS=5`)、`templates.py`(ファイル別帰属表示)、
+  `frontmatter.py`(Content Fingerprint `compute_content_fingerprint`、
+  `split_frontmatter`を`"---"`部分文字列一致から行単位の正規表現へ修正)、
+  `gitmeta.py`(`commit_exists`、hash形式チェック付き)、`promote-devlog.py`
+  (Fact Gateのpromotion時再検証: `source_project`のallowlist再確認+`source_commits`
+  全件の実在確認)、`mark-devlog-reviewed.py`(`reviewer_method`/`reviewed_at`/
+  `reviewed_content_hash`記録)、`validate-site.py`・`related.py`(重複していた
+  `split_frontmatter`実装を`frontmatter.py`の共有実装に統一)。`docs/devlog-policy.md`
+  24-31節・`docs/publish-checklist.md`に追記。independent-reviewerをコード2サイクル・
+  生成記事1サイクル実施(1周目コード: BLOCKER1[Fact Gate未検証]・MAJOR1[frontmatter
+  split](その他MINOR2)を検出→修正、記事: BLOCKER1[企画ラベル漏洩]・MAJOR4を検出→
+  修正、2周目コード: MAJOR2[hash形式未検証・split_frontmatter重複実装]を検出→修正、
+  最終確認)。`scripts/test_devlog.py`45/45 PASS(Fact Gate/tamper検知/hash形式等の
+  回帰テストを追加)、`validate-site.py`全項目PASS、`git diff --check`問題なし。
+  Promotion E2E・tamper-attack実証を最終コードに対して再実施(2026-08-08の実dataで
+  reviewer_status: pass記録→本文改変コピーは拒否→未改変オリジナルはFact Gate含む
+  全ゲート通過で`_articles/`昇格に成功→実験後に削除、本番`_articles/`/`drafts/`に
+  残留物なしを確認)。**結論**: 10日分の実データ再評価の結果、AUTO_PUBLISH_CANDIDATE
+  (80点以上)はスコア監査後は0件(直前まで82/81/80点だった3日が、二重加点修正分
+  ちょうど79点に下落。閾値は変更していない)。原因は主に(A)記事中心のこのリポジトリでは
+  Technical Depth軸が前提とする関数/クラス/テストのシグナルが構造的に出にくいこと、
+  (C)一部の日の開発規模自体が小さいこと。**READY_FOR_PHASE_3: NO**(「実データで
+  score≥80かつA評価の記事が最低1件」という成功条件が未達のため。それ以外のFact/
+  Security/Privacy/tamper耐性・テスト・validationはすべてPASS)。既知の未修正MAJOR2件
+  (Evidence Strength軸の他軸との重複、`_extract_single_line_replacement`のfrontmatter
+  境界を跨ぐ誤ペアリングの可能性)は`docs/devlog-policy.md`31節に記録。commit/pushは
+  このBatch完了後に実施予定
+
 - Dev Log自動生成 Phase 2(品質モデル・Sanitized Change Summary Layer・安全な自動公開能力)を実装。
   新規: `scripts/devlogkit/`パッケージ(allowlist/gitmeta/security/sanitize/classify/score/ja/
   templates/related/screenshots/observability/frontmatter/pipeline)、`scripts/promote-devlog.py`
@@ -170,41 +204,54 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
 
 ## Owner Action Required
 
-1. Amazon.co.jpアソシエイト規約について、英語表記のみで日本向けサイトとして十分かは規約に明記が
+1. **Dev Log Phase 3判断(READY_FOR_PHASE_3: NO)**: Phase 2.5の結論により、20:00完全自動運用
+   (Phase 3、スケジューラ登録・他project有効化)へは進んでいない(指示どおり)。実データで
+   score≥80のAUTO_PUBLISH_CANDIDATEが1件も出ていない(直近3日は79点で1点差)ため、
+   このまま「score≥80=人の手直し不要」と信頼してPhase 3(無人自動promotion)へ進むのは
+   時期尚早。選択肢: (a)Technical Depth軸の抽出をこのリポジトリ(記事中心)に合わせて
+   さらに拡張する追加ラウンドを実施してから再評価する、(b)DRAFT_ONLYまでは自動化し
+   AUTO_PUBLISH(無人昇格)は当面手動レビュー必須のまま運用する、(c)10日以上の分布を
+   踏まえた上で閾値自体の妥当性を再検討する(今回のSprintの都合のみでの引き下げは
+   明示的に禁止されている)。方針判断が必要
+2. `docs/devlog-policy.md`31節に記録した既知の未修正MAJOR2件(score.pyのEvidence
+   Strength軸が他軸と実質重複している設計上の緊張、`sanitize.py`の
+   `_extract_single_line_replacement`がfrontmatter境界を跨ぐ稀なケースで無関係な
+   文字列をペア化しうる可能性)を、次のDev Log関連ラウンドで対応するかどうかの優先度判断
+3. Amazon.co.jpアソシエイト規約について、英語表記のみで日本向けサイトとして十分かは規約に明記が
    なく確認できなかった点の最終確認(現状は日本語必須文言+英語補足で対応済み、追加対応の要否は任意)
-2. CONTENT_PLAN.mdへ新規提案した2記事は両方とも公開済み(カテゴリE「実践プロジェクト作品集」に
+4. CONTENT_PLAN.mdへ新規提案した2記事は両方とも公開済み(カテゴリE「実践プロジェクト作品集」に
    正式なカタログ番号を割り当てるかは未定。配達物検知は`esp32-loadcell-delivery-detection.md`、
    水検知センサー雨検知は`esp32-rain-sensor-detection.md`として存在)。正式な記事番号を追加する
    かどうかの判断が残る
-3. Dev Log PoCの`drafts/devlog-ai-tech-lab-2026-08-23.md`を実際に`_articles/`へ昇格(status:
+5. Dev Log PoCの`drafts/devlog-ai-tech-lab-2026-08-23.md`を実際に`_articles/`へ昇格(status:
    ready化)して公開するかどうかの判断。Phase 2の`scripts/promote-devlog.py`
    (+`scripts/mark-devlog-reviewed.py`)で昇格自体は可能になったが、機械的な要約レベルの内容の
    ため、公開する場合はtitle/primary_keywordの日本語化(docs/devlog-policy.md 9節)を推奨
-4. Dev Logの対象project拡大(`ai-content-engine`/`global-trend-discovery`/
+6. Dev Logの対象project拡大(`ai-content-engine`/`global-trend-discovery`/
    `line-stock-news-bot`/`content-revenue-engine`を`config/devlog-projects.yaml`で
    `enabled: true`/`public: true`にするか)は、各repositoryを公開してよいというOwnerの
    明示判断が出るまで保留
-5. Dev Logの20:00毎日自動実行(`scripts/run-daily-devlog.py`)をGitHub Actions cronまたは
+7. Dev Logの20:00毎日自動実行(`scripts/run-daily-devlog.py`)をGitHub Actions cronまたは
    Windows Task Schedulerへ実際に登録するかどうかの判断(Phase 2ではrunner自体は実装済みだが、
-   スケジューラへの登録は意図的に見送っている)
-6. 命名規則の改善提案(要判断): `_articles/`のファイル名`0N-slug.md`は、01〜04号が偶然
+   スケジューラへの登録は意図的に見送っている。上記1のPhase 3判断待ち)
+8. 命名規則の改善提案(要判断): `_articles/`のファイル名`0N-slug.md`は、01〜04号が偶然
    CONTENT_PLAN.mdのカテゴリA番号と一致していたために「公開順」と「CONTENT_PLAN上のカタログID」が
    同じ意味であるかのように見えていたが、実際には別の名前空間。第5号(配達物検知)で両者が衝突した
    ため、今回はファイル名から数字プレフィックスを落として回避した。今後もカテゴリを跨ぐ記事(実践
    プロジェクト作品集等)が増える見込みのため、`order:`frontmatterを公開順のSoTとし、ファイル名は
    常にslugのみ(数字プレフィックスなし)に統一する運用への変更を提案する。既存の01〜04は
    大規模renumberを避けるためそのまま維持し、今後の新規ファイルにのみ適用する案
-7. `privacy.md`の「運営者・お問い合わせ」章はGitHub Issuesリンクで暫定対応した。専用の問い合わせ
+9. `privacy.md`の「運営者・お問い合わせ」章はGitHub Issuesリンクで暫定対応した。専用の問い合わせ
    手段(メールアドレス等)を今後用意する場合は、この章の更新を検討
-8. `MEASUREMENT REQUIRED`: 下記「計測 TODO」を参照
-9. 第4号本文中に、既公開の第3号記事への同種の前方参照debtが残存(`_articles/01-arduino-toha-
-   hajimekata.md`の69行目・102行目、「別記事「Arduinoスターターキットの選び方」で扱う予定です」
-   →実リンク化されていない)。今回の第4号公開diffの対象外だったため見送ったが、次回の軽微な
-   修正機会に「第3号記事「...」」+リンクの形式へ統一することを推奨(independent-reviewer指摘)
-10. ESP32-CAM監視の続編記事(下記候補)で配線図・コードを扱う場合は、電源仕様など
+10. `MEASUREMENT REQUIRED`: 下記「計測 TODO」を参照
+11. 第4号本文中に、既公開の第3号記事への同種の前方参照debtが残存(`_articles/01-arduino-toha-
+    hajimekata.md`の69行目・102行目、「別記事「Arduinoスターターキットの選び方」で扱う予定です」
+    →実リンク化されていない)。今回の第4号公開diffの対象外だったため見送ったが、次回の軽微な
+    修正機会に「第3号記事「...」」+リンクの形式へ統一することを推奨(independent-reviewer指摘)
+12. ESP32-CAM監視の続編記事(下記候補)で配線図・コードを扱う場合は、電源仕様など
     安全上の注意点を必ず含めること(第5号は配線図・コードを意図的に割愛したため今回は問題なし、
     independent-reviewer指摘)
-11. `B09XMPPZYT`(USBシリアル変換器、第6号記事対象)が実際に購入した商品と同一か、オーナーに確認が
+13. `B09XMPPZYT`(USBシリアル変換器、第6号記事対象)が実際に購入した商品と同一か、オーナーに確認が
     必要(`B089LS556S`・`B0C9THDPXP`は2026年8月のAffiliate Sprintで確認済み・CTA実装済みのため、
     このリストからは除外した。詳細は下記「Affiliate ASIN管理」および「第5号 Affiliate実装済み内容」参照)
 

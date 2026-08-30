@@ -51,20 +51,40 @@ _FEATURE_RE = re.compile(r"^feat\b|\badd\b|\bimplement\b|\bintroduce\b|^publish\
 _UI_EXTENSIONS = {".css", ".scss", ".sass", ".less"}
 
 
+UI_FILE_RATIO_THRESHOLD = 0.5
+
+
 def classify_commit_type(commit, files):
     subject = commit["subject"]
-    exts = {Path(f["path"]).suffix.lower() for f in files}
 
     if _BUGFIX_RE.search(subject):
         return BUGFIX
     if _PERF_RE.search(subject):
         return PERFORMANCE
-    if _UI_RE.search(subject) or (exts & _UI_EXTENSIONS):
-        return UI
     if _ARCH_RE.search(subject):
         return ARCHITECTURE
+    if _UI_RE.search(subject):
+        return UI
     if _FEATURE_RE.search(subject):
         return FEATURE
+    # File-extension-based UI signal is trusted only when style files make
+    # up a MAJORITY of the changed files. Phase 2.5 finding: a commit
+    # subject-based classification always takes priority (above); this
+    # fallback used to fire on ANY single style file present regardless of
+    # how many other, unrelated files were also touched — e.g. a
+    # "monetization and analytics foundation" commit that happened to
+    # touch one assets/css/style.css among 19 otherwise backend/config
+    # files was misclassified as "UI/design", producing a misleading
+    # article section header for what the commit was actually about.
+    if files:
+        exts = [Path(f["path"]).suffix.lower() for f in files]
+        ui_ratio = sum(1 for e in exts if e in _UI_EXTENSIONS) / len(exts)
+        # Strictly MORE than half (not >=): docs/devlog-policy.md 25節 says
+        # "過半数" (a strict majority), so an exact 50/50 split (e.g. 1
+        # style file among 2 total) should not tip a commit into UI —
+        # independent review caught this code/docs mismatch.
+        if ui_ratio > UI_FILE_RATIO_THRESHOLD:
+            return UI
     return GENERIC
 
 

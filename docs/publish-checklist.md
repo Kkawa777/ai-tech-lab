@@ -104,6 +104,13 @@ Security/Privacyフィルタは[docs/devlog-policy.md](./devlog-policy.md)を正
 - [ ] (Phase 2)`scripts/promote-devlog.py`経由で`_articles/`へ昇格している(手動でファイルを
   移動・status書き換えしない。昇格条件〈status:draft/publish_decision/reviewer_status〉を
   スクリプト側で強制するため)
+- [ ] (Phase 2.5)`reviewer_status: pass`を記録した**後**に本文・frontmatterへ手直しを
+  加えていない。加えた場合は`reviewed_content_hash`が一致しなくなり`promote-devlog.py`が
+  昇格を拒否する(詳細は`docs/devlog-policy.md`28節)。手直しが正当なものであれば、
+  `scripts/mark-devlog-reviewed.py --pass`を再実行してレビュー記録を作り直す
+- [ ] (Phase 2.5)`source_commits`が実在するcommitであることを`promote-devlog.py`が
+  昇格時に再検証している(Fact Gate。`docs/devlog-policy.md`28節「Fact Gateの
+  promotion時再検証」)。存在しないhashが1件でもあれば昇格は拒否される
 
 ## 最終確認
 

@@ -7,7 +7,7 @@ decision logic to review and test — not a "Phase 1 path" and a separate
 """
 from pathlib import Path
 
-from . import classify, frontmatter, gitmeta, ja, related, score, screenshots, security, templates
+from . import classify, frontmatter, gitmeta, related, score, screenshots, security, templates
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 ARTICLES_DIR = ROOT / "_articles"
@@ -86,8 +86,7 @@ def run(project_key: str, entry: dict, repo_path: Path, date_str: str) -> Pipeli
     day_type = classify.classify_day_type([(c, c["files"]) for c in notable])
 
     display_name = entry.get("display_name", project_key)
-    title, used_japanese = templates.build_headline(display_name, notable)
-    _, coverage = ja.translate_subject(templates.clean_subject(notable[0]["subject"]))
+    title, used_japanese, coverage = templates.build_headline(display_name, notable)
 
     total_insertions = sum(c["stat"]["insertions"] for c in notable)
     total_deletions = sum(c["stat"]["deletions"] for c in notable)

@@ -7,10 +7,22 @@ This is Phase 2's two-stage structure (docs/devlog-policy.md 3節/19節):
     generate-devlog.py --write   ->  drafts/<slug>.md (status: draft)
     promote-devlog.py <draft>    ->  _articles/<slug>.md (status: ready)
 
-Promotion is refused unless ALL of the following hold (Step 16):
+Promotion is refused unless ALL of the following hold (Step 16, extended
+in Phase 2.5 Step 9-10 with the content-fingerprint check):
   - the file is under drafts/ and has status: draft
   - publish_decision is DRAFT_ONLY or AUTO_PUBLISH_CANDIDATE (not SKIP/BLOCKED)
   - reviewer_status is "pass" in the draft's frontmatter
+  - reviewed_content_hash matches a FRESH fingerprint of the file's
+    current content — i.e. NOTHING was edited (not one character) since
+    scripts/mark-devlog-reviewed.py --pass ran. This is stronger than the
+    Security/Privacy regex re-scan below: that only catches a KNOWN
+    pattern (a secret shape, a local path); the fingerprint catches ANY
+    change at all, including an unsupported sentence a human might add to
+    the body after review, a swapped source_commits entry, or a
+    publish_decision the reviewer never actually saw.
+  - the Security/Privacy gates still PASS on the current content
+    (kept as defense in depth alongside the fingerprint check, not
+    replaced by it)
 
 `reviewer_status` starts as "pending" and is NEVER set to "pass" by
 generate-devlog.py itself — only a human, or this session's own
@@ -34,7 +46,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from devlogkit import frontmatter as fm_lib, score
+from devlogkit import allowlist, frontmatter as fm_lib, gitmeta, score
 from devlogkit.frontmatter import ARTICLES_DIR, DRAFTS_DIR, build_order
 
 REQUIRED_DECISIONS = {"DRAFT_ONLY", "AUTO_PUBLISH_CANDIDATE"}
@@ -80,6 +92,62 @@ def main():
             "independent-reviewer(または人による最終レビュー)を経て、"
             "scripts/mark-devlog-reviewed.py で明示的にpassへ更新してから再実行してください。"
             "スコアだけでは昇格できない設計です。"
+        )
+
+    # Content fingerprint check (Phase 2.5 Step 9-10): the file's current
+    # content must hash to EXACTLY what mark-devlog-reviewed.py recorded
+    # when reviewer_status was set to "pass". Any edit since then — even
+    # one that doesn't match a known secret/path pattern — invalidates the
+    # review and blocks promotion.
+    reviewed_hash = fm.get("reviewed_content_hash")
+    if not reviewed_hash:
+        die(
+            "reviewed_content_hash がframontmatterに記録されていません。"
+            "scripts/mark-devlog-reviewed.py --pass を再実行してレビュー記録を作り直してください。"
+        )
+    current_hash = fm_lib.compute_content_fingerprint(fm, body)
+    if current_hash != reviewed_hash:
+        die(
+            "content fingerprintが一致しません。レビュー(reviewer_status: pass)が記録された後に、"
+            "本文またはfrontmatterが変更された可能性があります。レビュー後の改変はpromotionできません"
+            "(docs/devlog-policy.md Step 9-10)。変更が正当なものであれば、"
+            "scripts/mark-devlog-reviewed.py --pass を再実行して改めてレビュー・記録し直してください。"
+        )
+
+    # Fact Gate re-verification AT PROMOTION TIME (Phase 2.5 Step 9): an
+    # independent review found that nothing previously checked whether
+    # `source_commits` are real — the content-fingerprint check above only
+    # proves the frontmatter/body haven't changed SINCE review, not that
+    # what was reviewed was ever actually backed by this project's Git
+    # history in the first place. A hand-crafted or corrupted draft with
+    # fabricated hashes (or a stale/renamed source_project) would otherwise
+    # pass every other gate. This re-resolves source_project through the
+    # SAME deny-by-default allowlist used at generation time (so a project
+    # disabled after generation is also caught here) and confirms every
+    # hash in source_commits still resolves to a real commit.
+    if not fm.get("generated_from_git"):
+        die("generated_from_git が true ではありません。Git履歴から生成された記事のみpromotion対象です。")
+    source_project = fm.get("source_project")
+    projects = allowlist.load_allowlist()
+    entry = projects.get(source_project)
+    if entry is None:
+        die(f"Fact Gate: source_project '{source_project}' はallowlistに存在しません。")
+    if not entry.get("enabled") or not entry.get("public"):
+        die(f"Fact Gate: source_project '{source_project}' は enabled/public のいずれかが false です。")
+    entry_path = entry.get("path")
+    if not entry_path:
+        die(f"Fact Gate: source_project '{source_project}' のallowlistエントリに path がありません。")
+    repo_path = (fm_lib.ROOT / entry_path).resolve()
+    if not (repo_path / ".git").exists():
+        die(f"Fact Gate: {repo_path} はGitリポジトリではありません。")
+    source_commits = fm.get("source_commits") or []
+    if not source_commits:
+        die("Fact Gate: source_commits が空です。Git履歴由来の記事にはcommitの裏付けが必須です。")
+    missing = [h for h in source_commits if not gitmeta.commit_exists(repo_path, h)]
+    if missing:
+        die(
+            "Fact Gate: source_commits に、リポジトリ内に存在しないcommit hashが含まれています: "
+            f"{missing}。捏造・破損したdraft、またはproject/repoの取り違えの可能性があります。"
         )
 
     # Re-scan the draft's CURRENT content (not the score/gate results

@@ -414,3 +414,244 @@ Jekyll `exclude:`設定(`_config.yml`)への依存だけに頼らない、以下
 - 重複: 2026-08-23は既存draftとのdedupが正しく機能し、再生成されなかった
 - Hallucination: 生成された全文を目視確認した限り、Gitから確認できない体験・理由・
   数値は含まれていない(テンプレートが明示的に「未確認」と書くよう強制するため)
+
+# Phase 2.5: Auto-Publish Readiness Sprint(2026-08-31〜)
+
+Phase 2で「型はできたが、実データでAUTO_PUBLISH_CANDIDATEが一度も出ていない」状態
+だった点を検証するための監査サイクル。**閾値(80点)は一切変更していない**。
+
+## 24. Evidence Layer拡張(`scripts/devlogkit/sanitize.py` / `templates.py`)
+
+Sanitized Change Summary Layer(denylist→secret-scan→sanitizeの順序は不変)に、
+安全に抽出できる情報を追加した。
+
+- 見出し(`#`/`##`等)の追加検出、frontmatter/設定ファイルの**キー名のみ**の変更検出
+  (値は転記しない)、ファイル単位での関数/クラス/テスト名のグルーピング表示
+- 変更前後ペア抽出を、共通接頭辞を考慮した窓表示(`_highlight_diff_pair`)に変更し、
+  「見た目は同じだが実は違う」長い行の誤表示を修正
+- docs抜粋抽出をhunk単位にし、別々のhunkの行を1つの段落に連結してしまう不具合を修正
+- kramdownのIAL構文(`{: width="..."}`)やHTML+Liquidが混在する行、コードフェンス内部の
+  行が「地の文」として誤って引用される不具合を修正(`_is_mostly_markup`による判定に変更)
+- テスト追加を検知した場合、「実行結果(PASS/FAIL)はGit履歴からは確認できないため
+  本記事では言及していません」という限定を明記する検証セクションを追加(テストが
+  ある事実と、テストが通った事実を混同しない)
+- 見出し・設定キー・README抜粋を、当日全体のフラットなリストではなくファイル単位で
+  帰属表示するよう変更(独立レビューで、異なる2記事の見出しが出典なしに1つのリストへ
+  混在し読者が誤解しうる点を指摘されたための修正)
+- 内部の企画・SEOラベル(`検索意図:`/`search_intent`/`primary_keyword`)を含む行を
+  docs抜粋の抽出対象から除外(`INTERNAL_LABEL_LINE_RE`)。独立レビューで、
+  `CONTENT_PLAN.md`(次記事の企画リスト)内のこのラベル付き行が、生成記事の
+  「README/ドキュメントの追記内容」として読者にそのまま提示されてしまう実例が
+  見つかったため(BLOCKER判定→修正)
+- 見出しレベルのみの変更(例: `# X` → `## X`)を「見出しの新規追加」として重複計上
+  しないよう修正(同一hunk内で削除された見出しと同じテキストの見出しは"追加"扱いから
+  除外)。独立レビューで、同じ見出しが「新規追加」と「変更前後」の両方に矛盾した形で
+  提示される実例が見つかったため
+
+いずれも読み取り対象はGitのdiff/commit metadataのみで、値そのものを抽出する場合は
+既存のsecret-scanを必ず経由する(パイプラインの境界は変更していない)。
+
+## 25. 分類ロジックの修正(`scripts/devlogkit/classify.py`)
+
+commit件名ベースの分類(BUGFIX/PERFORMANCE/ARCHITECTURE/UI/FEATURE)を、ファイル拡張子
+ベースのフォールバックより常に優先するよう順序を修正した。また、UIフォールバックが
+「スタイル系ファイルが1件でもあれば発火する」実装になっており、19ファイル変更中
+CSSが1件だけのGA4/アフィリエイト機能追加commitが「デザインに関する変更」に誤分類されて
+いた実例を確認したため、スタイル系ファイルが変更ファイルの**過半数**を占める場合のみ
+UIフォールバックが発火するよう修正した(`UI_FILE_RATIO_THRESHOLD = 0.5`、比較は
+「過半数」の字義どおり`>`。独立レビューで実装が`>=`(ちょうど50%でも発火)になっており
+文書表現と食い違っている点を指摘され修正)。
+
+## 26. 日本語タイトル生成の改善(`scripts/devlogkit/ja.py`)
+
+- `VERB_MAP`/`JA_TERM_MAP`を、このリポジトリの実commit履歴に頻出する語彙(prevent/
+  validate/detect/generate/compare/select/retry/isolate/promote等の動詞、validation/
+  pipeline/draft/gate/score/promotion/hash/fingerprint等の名詞)で拡張した。プロジェクト
+  固有の固有名詞を大量に追加することはしていない(既知の限界として維持)
+- カバレッジ率が高くても、意味の単位が多すぎる(8語以上等)subjectを訳すと単語の羅列に
+  なり読めない実例を確認したため、`MAX_TRANSLATABLE_TOKENS = 5`をカバレッジ率とは独立の
+  上限として追加した。カバレッジ条件は`>= 0.6`に引き上げ(旧`>= 0.34`は緩すぎた)
+- タイトル生成はその日の最初のcommitのsubjectだけでなく、当日の全notable commitを
+  順に試し、最初に条件を満たしたものを採用するよう変更した(1件目が複雑すぎて訳せない
+  場合でも、後続のcommitで自然な日本語タイトルが作れることがある)
+
+## 27. Quality Score監査: 二重加点の発見と修正(`scripts/devlogkit/score.py`)
+
+Step 8の監査観点(「同じEvidenceで複数軸に二重加点していないか」)に沿って全5軸を
+手作業で洗い出した結果、`config_keys_changed`(frontmatter/設定キーの変更)が
+Development ValueとTechnical Depthの**両方**で加点されており、Phase 2.5自身が新設した
+「1シグナル・1軸」の設計原則(tests_addedのみが、Reader Value=読者への安心材料・
+Technical Depth=エンジニアリング上の裏付け、という2つの異なる主張を支えるため意図的に
+2軸で加点される唯一の例外)に反していることが判明した。
+
+設定キーの変更単独は、関数/クラス/テスト追加や変更前後ペアと並べて「技術的な深さ」の
+根拠にするには性質が異なる(実装コードの変更ではない)と判断し、Technical Depthの
+シグナル一覧から`config_keys_changed`を除外した(Development Valueには残す)。
+
+この修正は**スコアを既存の80点到達日に合わせて調整したものではなく**、逆にその結果、
+Phase 2.5の作業中に一時的にAUTO_PUBLISH_CANDIDATEとして観測されていた3日分
+(2026-08-08=82点、2026-08-20=81点、2026-08-30=80点)が、修正後はいずれも79点
+(DRAFT_ONLY)に下がった。3日とも下落幅は、修正前にTechnical Depthへ計上されていた
+`config_keys_changed`分にちょうど一致しており、この二重加点が閾値超えの決め手になって
+いたことを裏付けている。閾値自体は変更していない(Step 13の禁止事項どおり)。
+
+## 28. Content Fingerprint とレビュー来歴(`scripts/devlogkit/frontmatter.py`)
+
+`compute_content_fingerprint(frontmatter, body)`は、`status`/`order`/`reviewer_*`系
+フィールド(レビュー前後で正当に変わる、または来歴自体を記録するためのフィールド)を
+除いたfrontmatter全体とbodyをJSON化してSHA-256ハッシュ化したもの。`title`・
+`description`・`source_commits`・`publish_decision`・本文を含め、それ以外のすべての
+フィールドと内容がこのハッシュでロックされる。
+
+- `mark-devlog-reviewed.py --pass`が、`reviewer_method`(自由記述。個人名は記録しない)・
+  `reviewed_at`(UTC ISO8601)・`reviewed_content_hash`をこの順で記録する
+- `promote-devlog.py`は、`reviewer_status: pass`に加えて、**現在のファイル内容から
+  再計算したフィンガープリントが`reviewed_content_hash`と一致すること**を必須条件とした。
+  これは既存のSecurity/Privacy再スキャン(既知のパターンにしか反応しない)より強く、
+  レビュー後に1文字でも本文・frontmatterが変わっていれば理由を問わず昇格を拒否する
+
+**実機検証**(`scripts/test_devlog.py`の自動テストに加え、本ラウンドで手動でも実施):
+`drafts/`配下で本文末尾に1文追加したコピーに対し`promote-devlog.py`を実行したところ、
+「content fingerprintが一致しません」というエラーで昇格が拒否されることを確認した
+(改変前のオリジナルは正常に昇格できることも合わせて確認。手順の詳細は本ラウンドの
+作業ログを参照)。
+
+なお、この改修中に`frontmatter.split_frontmatter()`が本文の先頭改行を除去しておらず、
+読み込み→書き込みを1往復するたびに本文へ改行が2つずつ蓄積する不具合(フィンガープリントの
+冪等性を壊す)を発見し、`.lstrip("\n")`で修正した。フィンガープリント機能とは独立に
+存在していた実バグで、修正しなければ「変更していないファイルなのにハッシュが一致しない」
+という誤検知を起こしうるものだった。
+
+さらに独立レビューで、`split_frontmatter()`本体がテキスト中の`"---"`という3文字を
+リテラル検索して分割している(`text.split("---", 2)`)ため、`title`等の値に`"---"`が
+含まれると(例: commit件名`"docs: replace === with --- style"`がja.pyの英語フォール
+バック経由でそのまま埋め込まれた場合)誤った位置で分割されうるというMAJORが見つかった。
+`FRONTMATTER_DELIMITER_RE`(行全体が`---`である行のみにマッチする正規表現、
+`re.MULTILINE`)で先頭2つの区切り行を探す実装に置き換えて修正し、値に`---`を含む
+frontmatterのラウンドトリップを回帰テストに追加した。
+
+### Fact Gateのpromotion時再検証(`scripts/promote-devlog.py`)
+
+Content Fingerprintは「レビュー後に内容が変わっていないこと」は保証するが、
+「レビューされた内容がそもそも本物のGit履歴に裏付けられていること」までは保証しない。
+独立レビューでこの点がBLOCKERとして指摘された(既存テストの手書きfixtureが、
+実在しないcommit hash`"abc1234"`を含むdraftでも`reviewer_status: pass`とハッシュ一致
+さえ揃えば昇格に成功することを、テスト自身が証明していた)。
+
+対策として、`promote-devlog.py`にFact Gateのpromotion時再検証を追加した(content
+fingerprintチェックの直後、Security/Privacy再スキャンの直前)。
+
+- `generated_from_git`が`true`であること
+- `source_project`が`config/devlog-projects.yaml`のallowlistに存在し、かつ
+  `enabled`/`public`とも`true`であること(生成時だけでなく昇格時にも再確認するため、
+  生成後にプロジェクトが無効化された場合も検出できる)
+- `source_commits`が空でないこと、かつ**そのすべてのhashが実際に対象リポジトリの
+  commitとして存在すること**(`gitmeta.commit_exists()`、`git cat-file -e <hash>^{commit}`
+  で検証)
+
+いずれか1つでも満たさない場合はpromotionを拒否する(`scripts/test_devlog.py`の
+`test_promotion_rejected_when_source_commit_does_not_exist`で、正当にレビュー済み・
+フィンガープリント一致のdraftであっても、存在しないcommit hashが1つでも含まれていれば
+拒否されることを確認)。
+
+この初版実装には、`git cat-file -e <hash>^{commit}`がコミットhashだけでなく`HEAD`・
+ブランチ名等のシンボリック参照も解決してしまうという抜け穴が2回目の独立レビューで
+見つかった(`source_commits: ["HEAD"]`のようなdraftが、hashの形をしていないにも
+かかわらず「実在するcommitである」と誤判定されうる)。`gitmeta.commit_exists()`に
+16進hash形式(7〜40文字)であることの事前チェックを追加して修正し、
+`test_promotion_rejected_when_source_commit_is_a_symbolic_ref`で回帰を防止した。
+
+また、`frontmatter.split_frontmatter()`と全く同じ「`"---"`部分文字列で分割」バグが、
+`scripts/validate-site.py`(Publication Gate/CIで使用)と`scripts/devlogkit/related.py`
+(関連記事マッチングで使用)にそれぞれ独立実装として重複していたことも2回目のレビューで
+見つかった。両方とも独自実装を削除し、`devlogkit.frontmatter.split_frontmatter`を
+共有で呼び出す形に統一した(同じ修正を3箇所に別々に適用する重複保守を避けるため)。
+
+## 29. 10日分の実データ評価と結論
+
+このリポジトリ自身のGit履歴から、既存のdedup(`source_commits`)と衝突しない10日分を
+評価した(実際に記事ファイルを大量生成することはせず、`pipeline.run()`を直接呼び出す
+dry-run相当の評価のみ)。
+
+| 日付 | commit概要 | Score | 判定 |
+|---|---|---|---|
+| 2026-08-06 | 創業日、7 commit(型がGENERIC) | 67 | DRAFT_ONLY |
+| 2026-08-07 | 4 commit(1件trivial除外) | 53 | SKIP |
+| 2026-08-08 | Arduino記事へのビジュアルガイド追加・レイアウト改善・IDEインストール記事公開、3 commit | 79 | DRAFT_ONLY |
+| 2026-08-12 | 2 commit | 64 | DRAFT_ONLY |
+| 2026-08-20 | ESP32ロードセル関連、1 commit | 79 | DRAFT_ONLY |
+| 2026-08-21 | 1 commit | 61 | DRAFT_ONLY |
+| 2026-08-22 | 記事2本公開 | 67 | DRAFT_ONLY |
+| 2026-08-23 | (既存draftとdedup、再評価対象外) | - | SKIP(dedup) |
+| 2026-08-24 | 1 commit | 69 | DRAFT_ONLY |
+| 2026-08-30 | Dev Log自動化PoC、5 commit | 79 | DRAFT_ONLY |
+
+**結論(Step 13の分類に従う)**: 上記の27節のスコア監査修正を適用した結果、この
+10日間では**80点以上(AUTO_PUBLISH_CANDIDATE)に到達した日は0件**だった。最も近い
+3日(2026-08-08/2026-08-20/2026-08-30)はいずれも79点で1点差だが、この1点は
+二重加点の除去分そのものであり、それを埋め合わせるための閾値変更・スコア調整は
+行っていない(Step 13で明示的に禁止されている「今回の目的のためだけの閾値変更」に
+該当するため)。
+
+原因の分類:
+- **(A) 生成器の抽出能力がまだ不十分**: 本リポジトリは記事(Markdown)中心のサイトで
+  あり、Technical Depth軸が前提とする「関数/クラス/テスト」シグナルは、記事執筆や
+  レイアウト調整が中心の日にはそもそも発生しにくい。config_keys_changedを含めれば
+  79点は80点に届いていたが、27節の理由によりTechnical Depthへの計上は妥当でないと
+  判断した。記事中心のリポジトリに合ったTechnical Depth相当の代替シグナル
+  (例: テンプレート構造の変更、before/afterペアの複数件評価等)を今後の別ラウンドで
+  検討する余地がある
+- **(C) 一部の日の開発規模自体が小さい**: 2026-08-07/12/21等はnotable commitが1〜3件
+  程度で、Development Value・SEO Potentialの伸びしろが構造的に小さい
+
+閾値変更(D)は、今回の10日分布だけでは正当化しない(1点差の近似は複数日あるが、
+「10日以上のデータに基づく」という条件は満たしても、「今回の作業の都合で下げる」
+ことと区別がつかないため、本ラウンドでは見送り、Owner判断待ちの論点として残す)。
+
+## 30. Promotion E2E実証(実データ、実験後に削除)
+
+2026-08-08のdraftで2回実施した。1回目は24節の記事品質修正・27節のスコア監査直後
+(Fact Gateのpromotion時再検証を実装する前)に実施し、`mark-devlog-reviewed.py --pass
+--method "manual-self-review-substitute"`で記録した上でtamper拒否・正常昇格・
+実験成果物の削除を確認した。その後、独立レビューで生成記事のBLOCKER(28節参照)と
+Fact Gate自体の抜け穴(28節「Fact Gateのpromotion時再検証」参照)が見つかり、
+両方を修正したため、**最終コードに対する2回目のE2Eを実施し直した**(こちらが
+最終的な実証結果)。
+
+1. 修正後のコードで2026-08-08のdraftを再生成(`--write`、score=79、DRAFT_ONLY。
+   検索意図ラベル漏洩・見出しの自己矛盾がいずれも解消されていることを本文で確認)
+2. `mark-devlog-reviewed.py --pass --method "independent-reviewer(BLOCKER1件検出→
+   修正、修正内容を手動で再確認)"`でレビュー来歴を記録
+3. レビュー記録後に本文へ1文追加したコピーに対し`promote-devlog.py`を実行 →
+   content fingerprint不一致で拒否(エラーメッセージを確認)
+4. 改変していないオリジナルに対し`promote-devlog.py`を実行 → 新設のFact Gate
+   (source_project/source_commits の実在性チェック)を含めすべてのゲートを通過して
+   `_articles/`への昇格に成功し、`scripts/validate-site.py`も全項目PASS
+5. 実験目的の昇格だったため、確認後に`_articles/devlog-ai-tech-lab-2026-08-08.md`を
+   削除し、本番`_articles/`・`drafts/`に実験成果物を残していないことを`git status`で
+   確認した
+
+DRAFT_ONLY判定の記事で実証した(AUTO_PUBLISH_CANDIDATEは29節のとおり0件だったため)。
+`promote-devlog.py`はDRAFT_ONLY/AUTO_PUBLISH_CANDIDATEのどちらも同じゲート
+(reviewer_status=pass + content fingerprint一致 + Fact Gate + Security/Privacy
+再スキャン)で扱う設計であり、この実証はメカニズム自体の健全性を確認するものである。
+
+## 31. 既知の未解決事項(次ラウンドへの申し送り)
+
+2回にわたる独立レビューで指摘されたが、本ラウンドでは意図的に修正を見送った項目
+(quality-developmentのIterative Refinement終了条件に従い、無限に修正ループを
+続けるのではなくBLOCKEDとして明示的に記録する)。
+
+- **[MAJOR] Evidence Strength軸(`score.py`)の他軸との重複**: `evidence`リストは
+  functions/classes/tests/docs/headings/config_keys/behavior_pairsの各シグナルから
+  機械的に1件ずつ追加されるため、Evidence Strengthは実質的にこれらの軸と強く相関し、
+  27節で修正した「1シグナル・1軸」の原則を完全には満たしていない。軸の再設計は
+  スコア全体の再検証(10日分の再評価・記事の再生成・レビュー)を要する規模のため、
+  次ラウンドの課題とする
+- **[MAJOR] `_extract_single_line_replacement`(`sanitize.py`)のfrontmatter境界を
+  跨いだ誤ペアリングの可能性**: `_filter_out_frontmatter_lines`は追加(`+`)行のみを
+  frontmatter範囲で除外し、削除(`-`)行は素通りさせるため、同一hunk内でfrontmatterの
+  折返し継続行の削除と本文プロースの追加が同時に起きた場合、無関係な文字列同士が
+  「変更前後」としてペア化される可能性が理論上残る。狭いcontext(`-U1`)かつ複数条件が
+  同時に揃う必要がある稀なケースであり、次ラウンドで`_filter_out_frontmatter_lines`の
+  削除行側にも同様の範囲追跡を拡張することを推奨する

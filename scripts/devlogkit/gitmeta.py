@@ -18,6 +18,31 @@ def run_git(repo_path, args):
     return result.stdout
 
 
+_COMMIT_HASH_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+
+
+def commit_exists(repo_path, commit_hash):
+    """True iff `commit_hash` is a literal hex commit hash AND resolves to
+    a real commit object in this repo. Used at promotion time (Phase 2.5
+    Step 9) to verify `source_commits` actually came from this Git
+    history, rather than trusting a draft's frontmatter at face value.
+
+    The hex-shape check matters independently of the `^{commit}` peel
+    below: `git cat-file -e` happily resolves a SYMBOLIC ref too (e.g.
+    "HEAD", a branch name, "HEAD~2"), and any of those would peel to
+    *some* real commit in a repo that has commits at all — an independent
+    review found this meant `source_commits: ["HEAD"]` in a hand-crafted
+    draft could still pass this check despite not naming any specific,
+    verifiable commit."""
+    if not _COMMIT_HASH_RE.match(commit_hash):
+        return False
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), "cat-file", "-e", f"{commit_hash}^{{commit}}"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    return result.returncode == 0
+
+
 def list_commits_on_date(repo_path, date_str):
     out = run_git(repo_path, ["log", "--date=short", "--pretty=format:%H%x1f%ad%x1f%s"])
     commits = []

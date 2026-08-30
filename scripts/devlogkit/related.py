@@ -10,12 +10,12 @@ from pathlib import Path
 
 import yaml
 
+from .frontmatter import split_frontmatter as _split_frontmatter_and_body
+
 
 def _split_frontmatter(text):
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return None
-    return parts[1]
+    fm_text, _ = _split_frontmatter_and_body(text)
+    return fm_text
 
 
 def _keywords_from_text(text):
