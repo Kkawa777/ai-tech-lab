@@ -26,9 +26,12 @@ Step 0 適用判定
   → Step 6 Independent Review (CHECK_RESULT)
   → Step 7 Iterative Refinement判定
   → Step 8 Final Validation
-  → Step 9 State Update
+  → Step 9 State Update + Reusable Pattern Check
   → Step 10 完了報告
 ```
+
+工程間(Research / Architect / Developer / independent-reviewer / Lead)の作業引き継ぎには
+`references/handoff-format.md` の構造化HANDOFFを使う。
 
 ## Step 0: 適用判定
 
@@ -57,7 +60,9 @@ LOWリスク(`stop-conditions.md`参照)の変更は単一Taskのまま省略し
 
 ## Step 3: 実装・執筆
 
-通常どおり作業する。
+通常どおり作業する。UI/UXを伴う実装は、発火条件・優先順位を含めCLAUDE.mdの「UI/UX Specialist」を
+正本として`ui-ux-pro-max` Skillを併用する。既存UI/Design Systemとの一貫性を`ui-ux-pro-max`の
+提案より優先する。
 
 ## Step 4: Automated Validation
 
@@ -76,7 +81,9 @@ Step 3に戻って修正する。該当する自動チェックが存在しな�
 決める。固定リストは持たない。
 
 記事の場合は独自基準を新設せず、`docs/publish-checklist.md` の観点(インタビュー・事実性、初心者向け
-分かりやすさ、技術・安全、SEO、アフィリエイト、GitHub運用)を評価基準の土台にする。
+分かりやすさ、技術・安全、SEO、アフィリエイト、GitHub運用)を評価基準の土台にする。UI/UXを伴う変更の
+場合は、`ui-ux-pro-max`のaccessibility/anti-patternチェックとCLAUDE.mdの優先順位(既存UIとの
+一貫性を優先)を評価基準の土台にする。
 
 各基準を100点満点で採点し、減点理由を短く記録する。
 
@@ -112,7 +119,7 @@ MEDIUM/HIGHでは必須)。作成者本人と同じ会話コンテキストで�
 Batch(2〜3 Task)がすべて完了した時点で、関係する自動チェックを再確認し、Claude Codeの通常操作
 (Skill/Agentの読み込み、設定ファイルのパース等)を壊していないかを確認する。
 
-## Step 9: State Update
+## Step 9: State Update + Reusable Pattern Check
 
 [`docs/TODO.md`](../../../docs/TODO.md) を現在の状態に更新する(`In Flight` / `Completed` /
 `Owner Action Required` / `Blocked` / `Next Up` を付け替える。ログとして追記せず、その都度上書きする)。
@@ -126,6 +133,38 @@ Batch(2〜3 Task)がすべて完了した時点で、関係する自動チェッ
 言及のみを残し詳細な経緯は書かない)、`Owner Action Required`はオーナー判断待ちの項目のみ、`Next Up`は
 直近の実行候補のみ、`Blocked`は現在有効なBlockerのみ。過去の履歴を保持するための新しい仕組み(別ファイル・
 ログ等)は作らない。
+
+### Reusable Pattern Check(Batch完了時)
+
+Batch(2〜3 Task)・機能実装・重要デバッグの完了時に、State Updateと合わせて毎回実行する
+(明示指示を待たない)。LOWリスクの単一Task(`references/stop-conditions.md`「5. リスクベースの
+品質ゲート」)では省略してよい。今回の手順・知見について次を確認する:
+
+1. 今回の成功手順は他プロジェクトでも再利用可能か
+2. 新しいSkillとして一般化できるか
+3. 既存Skillを改善できる知見か
+4. `CLAUDE.md` へ追加すべき恒久的なプロジェクトルールか
+5. グローバル設定(`~/.claude` 等)へ追加すべきルールか
+6. `knowledge/` へ記録すべき意思決定・失敗・成功パターンか
+7. 一時的・プロジェクト固有で保存不要か
+
+判定を次のいずれかで示す(`REUSABLE_PATTERN:`):
+
+- `NONE` — 一時的/自明。保存しない
+- `SECOND_BRAIN_ONLY` — `knowledge/` へ記録する。`knowledge-management` Skillの書き込み基準で
+  `decisions` / `experiments` / `lessons` / `revenue` / `ideas` のいずれかへ
+- `UPDATE_EXISTING_SKILL` — 既存Skillの手順を更新する
+- `NEW_SKILL_CANDIDATE` — 新Skill候補(下記5条件をすべて満たす場合のみ)
+- `UPDATE_PROJECT_RULE` — `CLAUDE.md` へ恒久ルールを追記(HIGHリスクに準じオーナー確認)
+- `UPDATE_GLOBAL_RULE` — グローバル設定の変更(オーナー確認必須)
+
+`NEW_SKILL_CANDIDATE` は次をすべて満たすときのみとする: 複数プロジェクトで再利用できる /
+手順が再現可能 / 明確な入力と出力がある / 人間またはClaude Codeの判断コストを削減できる /
+既存Skillと重複していない。一度しか使わない処理・プロジェクト固有処理はSkill化しない。
+
+`SECOND_BRAIN_ONLY` 以上と判定したものだけを `knowledge-management` Skillへ引き継ぐ。単なる作業ログを
+大量保存しない。`UPDATE_PROJECT_RULE` / `UPDATE_GLOBAL_RULE` はオーナー承認を得るまで適用しない
+(`references/stop-conditions.md`「1. 重大判断リスト」に準じる)。
 
 ## Step 10: 完了報告
 
@@ -145,6 +184,12 @@ Batch(2〜3 Task)がすべて完了した時点で、関係する自動チェッ
 3. `docs/TODO.md`(現在の実行状態)
 4. 関連するコード/記事ファイル
 5. `git diff` / `git status`
+
+これは「現在状態の復元」の順序。工程間(Research → Architect → Developer → independent-reviewer
+→ Lead)で成果物・確定した判断・残課題を受け渡す場合は、目的が異なるため
+[`references/handoff-format.md`](references/handoff-format.md) の構造化HANDOFFを使う。
+短いタスクはセッション内で完結させ、永続ファイルは長時間・複数Agent・コンテキスト喪失リスクがある
+場合のみ作る。
 
 ## Prompt Cache / Context Efficiency
 
@@ -193,3 +238,5 @@ Context肥大化・Taskのテーマが大きく変わる・大量のTool output�
 - `references/stop-conditions.md` — 重大判断リスト、リスクベースの品質ゲート(LOW/MEDIUM/HIGH)、
   Iterative Refinementの終了条件、重大度定義(このスキルと `independent-reviewer` エージェントの
   共通の正本)
+- `references/handoff-format.md` — 工程・Agent・Skill間の作業引き継ぎに使う構造化HANDOFF
+  フォーマットと、セッション内/永続ファイルの判断基準(`CLAUDE.md`「Agent間HANDOFF標準」から参照される)
