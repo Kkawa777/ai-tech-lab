@@ -52,8 +52,10 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
   score≥80かつA評価の記事が最低1件」という成功条件が未達のため。それ以外のFact/
   Security/Privacy/tamper耐性・テスト・validationはすべてPASS)。既知の未修正MAJOR2件
   (Evidence Strength軸の他軸との重複、`_extract_single_line_replacement`のfrontmatter
-  境界を跨ぐ誤ペアリングの可能性)は`docs/devlog-policy.md`31節に記録。commit/pushは
-  このBatch完了後に実施予定
+  境界を跨ぐ誤ペアリングの可能性)は`docs/devlog-policy.md`31節に記録。commit `551496d`
+  (`feat: improve Dev Log auto-publish readiness`)としてpush、GitHub Actions
+  build/deploy成功、本番確認(devlog draft/config非公開のまま、既存記事・ホームに影響
+  なし)まで完了
 
 - Dev Log自動生成 Phase 2(品質モデル・Sanitized Change Summary Layer・安全な自動公開能力)を実装。
   新規: `scripts/devlogkit/`パッケージ(allowlist/gitmeta/security/sanitize/classify/score/ja/
