@@ -97,6 +97,13 @@ Security/Privacyフィルタは[docs/devlog-policy.md](./devlog-policy.md)を正
 - [ ] `title`・`primary_keyword`が日本語の自然な検索クエリになるよう見直されている(機械生成の
   ままだとcommit message由来の英語表記が残ることがある。書き換えなくても事実性は損なわれないが、
   SEO上は推奨。詳細は`docs/devlog-policy.md`9節)
+- [ ] (Phase 2)`quality_score`が算出され、Security/Privacy/Fact 3つのgateがすべて`PASS`
+  になっている(1つでも`FAIL`なら`publish_decision`は`BLOCKED`となり、昇格対象外)
+- [ ] (Phase 2)`reviewer_status`が`pass`になっている(`scripts/mark-devlog-reviewed.py`で
+  明示的に記録されたもののみ有効。`generate-devlog.py`は自動でpassにしない)
+- [ ] (Phase 2)`scripts/promote-devlog.py`経由で`_articles/`へ昇格している(手動でファイルを
+  移動・status書き換えしない。昇格条件〈status:draft/publish_decision/reviewer_status〉を
+  スクリプト側で強制するため)
 
 ## 最終確認
 

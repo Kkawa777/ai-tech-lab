@@ -2,6 +2,10 @@
 .DS_Store
 Thumbs.db
 
+# Jekyll build output (never commit the built site)
+_site/
+.jekyll-cache/
+
 # Editor
 .vscode/
 .idea/
@@ -21,6 +25,10 @@ node_modules/
 # Python (scripts/)
 __pycache__/
 *.pyc
+
+# Dev Log automation: operational run logs (JSONL), not site content or
+# reviewed documentation (scripts/devlogkit/observability.py)
+devlog-logs/
 
 # Environment / secrets
 .env
