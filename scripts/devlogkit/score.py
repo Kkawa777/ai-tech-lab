@@ -62,9 +62,24 @@ PRIVACY_LEAK_PATTERNS = [
 #                                     counted twice toward one claim
 #   functions_added/classes_added -> Technical Depth only
 #   behavior_pairs (before/after)  -> Technical Depth only
+#   structural_files_changed        -> Technical Depth only (Phase 2.6: see
+#                                       below — a distinct, path-based
+#                                       signal, not a rename of an existing
+#                                       one, so it doesn't dilute the axis)
 #   evidence count / diversity      -> Evidence Strength (how much
 #                                       CONFIRMED_GIT_FACT exists at all)
 #   day_type / title coverage        -> SEO Potential
+#
+# Phase 2.6 finding: a 10-day real-data evaluation (Phase 2.5) showed
+# Technical Depth structurally under-scoring this repo's actual work,
+# because functions_added/classes_added/tests_added are Python/JS/Go-
+# shaped regexes that see nothing on a typical content-authoring day —
+# even a day that did real Jekyll layout/include/template/stylesheet
+# engineering (Liquid + HTML + CSS, not Python). `structural_files_changed`
+# (sanitize.py, path-based: `_layouts/`, `_includes/`, `templates/`, or a
+# stylesheet) is a genuinely NEW, orthogonal signal for that — not a
+# rebrand of a signal already credited elsewhere, and not sized to hit any
+# particular score.
 
 
 def score_development_value(day_stats, summary):
@@ -96,7 +111,7 @@ def score_reader_value(summary):
 EVIDENCE_TYPE_SUFFIXES = (
     "function signature added", "class signature added", "test added",
     "docs/README prose excerpt", "heading added", "frontmatter key added",
-    "single-line before/after",
+    "single-line before/after", "structural layout/template/stylesheet file changed",
 )
 
 
@@ -126,13 +141,21 @@ def score_technical_depth(summary):
     # Technical Depth is meant to measure (functions/classes/tests/before-
     # after evidence are genuine code-level signals; a config key by
     # itself is shallower than that and doesn't belong alongside them).
+    #
+    # structural_files_changed (Phase 2.6) DOES appear here — unlike
+    # config_keys_changed, it isn't credited anywhere else (Development
+    # Value only scores commit/line count and config keys), and it fills a
+    # real gap: this repo's most common form of non-content technical work
+    # (Jekyll layout/include/template/stylesheet engineering) has no
+    # function/class/test shape for the regexes above to find at all.
     signal_types_present = sum([
         bool(summary["functions_added"]),
         bool(summary["classes_added"]),
         bool(summary["tests_added"]),
         bool(summary["behavior_pairs"]),
+        bool(summary.get("structural_files_changed")),
     ])
-    return min(20, signal_types_present * 5)
+    return min(20, signal_types_present * 4)
 
 
 def score_seo_potential(day_type, ja_coverage_ratio):

@@ -53,6 +53,20 @@ _UI_EXTENSIONS = {".css", ".scss", ".sass", ".less"}
 
 UI_FILE_RATIO_THRESHOLD = 0.5
 
+# Phase 2.6: primary_keyword previously embedded the raw English day_type
+# constant (e.g. "AI-Tech-Lab feature") even on days whose title translated
+# fully to Japanese — an independent review flagged this as inconsistent
+# with docs/publish-checklist.md's Dev Log Gate requirement that
+# primary_keyword read as a natural Japanese search query.
+DAY_TYPE_JA_LABEL = {
+    FEATURE: "新機能",
+    BUGFIX: "不具合修正",
+    PERFORMANCE: "パフォーマンス改善",
+    UI: "UI改善",
+    ARCHITECTURE: "構造改善",
+    GENERIC: "開発ログ",
+}
+
 
 def classify_commit_type(commit, files):
     subject = commit["subject"]

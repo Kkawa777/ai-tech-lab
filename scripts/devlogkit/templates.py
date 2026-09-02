@@ -18,6 +18,21 @@ def clean_subject(subject):
     ).strip()
 
 
+def translated_or_original(cleaned_subject):
+    """Try to translate one already-`clean_subject()`-ed commit subject to
+    natural Japanese; return the original (English) subject unchanged if
+    it doesn't meet ja.coverage_is_usable()'s bar. Shared by build_headline
+    (title) and pipeline.py (description/primary_keyword) so a day's
+    `description` doesn't silently stay 100% untranslated English while
+    its `title` is fully Japanese — an independent review (Phase 2.6)
+    found that specific inconsistency read as a generation bug rather
+    than a consistent, honest fallback."""
+    phrase, coverage, token_count = ja.translate_subject(cleaned_subject)
+    if ja.coverage_is_usable(coverage, token_count):
+        return phrase, True
+    return cleaned_subject, False
+
+
 def build_headline(display_name, notable):
     """Returns (title_text, used_japanese: bool, coverage_used: float).
 

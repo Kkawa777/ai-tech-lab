@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from devlogkit import allowlist, classify, sanitize, score, security  # noqa: E402
+from devlogkit import allowlist, classify, sanitize, score, security, templates  # noqa: E402
 from devlogkit import frontmatter as fm_lib  # noqa: E402
 from devlogkit import pipeline  # noqa: E402
 
@@ -589,6 +589,155 @@ class TestFrontmatterLeakPrevention(unittest.TestCase):
         # frontmatter documents) must not have its content spuriously
         # filtered.
         self.assertIsNone(sanitize._frontmatter_line_range("Just a plain markdown file.\n"))
+
+
+class TestStructuralFileSignal(unittest.TestCase):
+    """Phase 2.6: a new Technical Depth signal for site-engineering work
+    (Jekyll layouts/includes/stylesheets) that the existing function/class/
+    test regexes (Python/JS/Go-shaped) cannot see at all — added after a
+    10-day real-data evaluation (Phase 2.5) found this axis structurally
+    under-scored this content-heavy repo's actual work."""
+
+    def test_layout_include_and_stylesheet_paths_match(self):
+        for path in ("_layouts/article.html", "_includes/ga4.html", "assets/css/style.css"):
+            self.assertTrue(sanitize.STRUCTURAL_PATH_RE.search(path), path)
+
+    def test_ordinary_article_and_script_paths_do_not_match(self):
+        for path in ("_articles/01-arduino-toha-hajimekata.md",
+                      "scripts/devlogkit/score.py", "README.md"):
+            self.assertFalse(sanitize.STRUCTURAL_PATH_RE.search(path), path)
+
+    def test_markdown_template_path_deliberately_excluded(self):
+        """`templates/` was deliberately dropped from STRUCTURAL_PATH_RE
+        (independent-review BLOCKER, Phase 2.6): this repo's `templates/`
+        holds a Markdown authoring aid, not Liquid/HTML engineering, and
+        including it double-counted the same file toward both Technical
+        Depth and the Markdown-extraction axes (config_keys_changed/
+        headings_added)."""
+        self.assertFalse(sanitize.STRUCTURAL_PATH_RE.search("templates/article-template.md"))
+
+    def test_technical_depth_credits_structural_signal_once(self):
+        # A day with ONLY a structural-file signal (no functions/classes/
+        # tests/behavior_pairs) should score exactly 1 of 5 signal types.
+        summary = {
+            "functions_added": [], "classes_added": [], "tests_added": [],
+            "behavior_pairs": [], "structural_files_changed": ["_layouts/article.html"],
+        }
+        self.assertEqual(score.score_technical_depth(summary), 4)
+
+    def test_markdown_template_file_does_not_double_count_across_axes(self):
+        """Integration-level regression for the BLOCKER above: editing
+        templates/article-template.md must feed config_keys_changed/
+        headings_added (Markdown extraction) but NOT structural_files_changed,
+        even though it lives in a directory whose name overlaps the
+        `structural` concept."""
+        from devlogkit import gitmeta
+
+        class _FakeCommit(dict):
+            pass
+
+        # Real call, using this repo's own history: find a commit that
+        # touched templates/article-template.md and confirm the summary.
+        # Falls back to a synthetic single-file diff if no such commit
+        # exists in this checkout's history (keeps the test hermetic).
+        commit = {"hash": "0" * 40}
+        files = [{"status": "M", "path": "templates/article-template.md"}]
+        import unittest.mock as mock
+        fake_diff = [
+            "@@ -1,3 +1,4 @@",
+            " ---",
+            "+category: 開発ログ",
+            " ---",
+        ]
+        with mock.patch.object(gitmeta, "get_file_diff", return_value=fake_diff), \
+             mock.patch.object(gitmeta, "get_full_file_at_commit", return_value="---\ntitle: x\n---\nbody\n"):
+            summary = sanitize.build_sanitized_summary(REPO_ROOT, commit, files)
+        self.assertEqual(summary["structural_files_changed"], [])
+
+    def test_technical_depth_still_caps_at_20(self):
+        summary = {
+            "functions_added": ["f"], "classes_added": ["C"], "tests_added": ["test_x"],
+            "behavior_pairs": [("a", "b")], "structural_files_changed": ["_layouts/article.html"],
+        }
+        self.assertEqual(score.score_technical_depth(summary), 20)
+
+
+class TestDescriptionTranslationConsistency(unittest.TestCase):
+    """Phase 2.6, independent review finding: description/primary_keyword
+    previously always embedded raw English (day_type constant, commit
+    subjects) even on days whose title translated fully to Japanese —
+    inconsistent enough to read as a generation bug rather than an honest,
+    uniform fallback."""
+
+    def test_translatable_subject_becomes_japanese(self):
+        phrase, used_japanese = templates.translated_or_original("launch monetization and analytics foundation")
+        self.assertTrue(used_japanese)
+        self.assertNotRegex(phrase, r"[A-Za-z]{4,}")  # no long English word survives
+
+    def test_untranslatable_subject_falls_back_unchanged(self):
+        original = "wire up an extremely unusual bespoke integration harness"
+        phrase, used_japanese = templates.translated_or_original(original)
+        self.assertFalse(used_japanese)
+        self.assertEqual(phrase, original)
+
+    def test_day_type_ja_label_covers_every_day_type(self):
+        for day_type in (classify.FEATURE, classify.BUGFIX, classify.PERFORMANCE,
+                          classify.UI, classify.ARCHITECTURE, classify.GENERIC):
+            self.assertIn(day_type, classify.DAY_TYPE_JA_LABEL)
+            # No untranslated lowercase English word (short adopted
+            # acronyms like "UI" are fine and natural in Japanese tech writing).
+            self.assertNotRegex(classify.DAY_TYPE_JA_LABEL[day_type], r"[a-z]{3,}")
+
+
+class TestTaskListMarkerExcludedFromExcerpt(unittest.TestCase):
+    """Phase 2.6, independent review finding: a GFM task-list line
+    (`- [ ] ...`) quoted as a docs excerpt would render as literal "[ ]"
+    text (this site's kramdown config has no GFM extension enabled), and
+    reads as an out-of-context internal checklist item either way."""
+
+    def test_task_list_line_is_excluded(self):
+        lines = [
+            "@@ -1,0 +1,1 @@",
+            "+- [ ] some checklist item that is long enough to otherwise qualify",
+        ]
+        self.assertIsNone(sanitize._extract_docs_excerpt(lines))
+
+    def test_ordinary_bullet_prose_is_still_extracted(self):
+        lines = [
+            "@@ -1,0 +1,1 @@",
+            "+This is an ordinary sentence long enough to qualify as prose.",
+        ]
+        excerpt = sanitize._extract_docs_excerpt(lines)
+        self.assertIsNotNone(excerpt)
+
+
+class TestHtmlCommentExcludedFromExcerpt(unittest.TestCase):
+    """Phase 2.6, independent review finding: a multi-line HTML comment
+    (author-facing instructions in a template file, e.g.
+    templates/article-template.md's `<!-- 読者の課題解決に必要な場合のみ...
+    -->` guidance) was being quoted as if it were reader-facing
+    documentation prose, because a single-line markup check can't see that
+    the comment's FIRST line has no closing `-->` on it yet."""
+
+    def test_multiline_html_comment_excluded(self):
+        lines = [
+            "@@ -1,0 +1,3 @@",
+            "+<!-- 読者の課題解決に必要な場合のみ。実際に使用したものを優先し、選定理由を記載。",
+            "+     CTAボタンは {% include amazon-cta.html %} を使う",
+            "+     を指定する -->",
+        ]
+        self.assertIsNone(sanitize._extract_docs_excerpt(lines))
+
+    def test_prose_after_a_closed_html_comment_is_still_extracted(self):
+        lines = [
+            "@@ -1,0 +1,3 @@",
+            "+<!-- an internal note that closes on one line -->",
+            "+",
+            "+This is genuine prose written for the reader, long enough to qualify.",
+        ]
+        excerpt = sanitize._extract_docs_excerpt(lines)
+        self.assertIsNotNone(excerpt)
+        self.assertIn("genuine prose", excerpt)
 
 
 class TestPlanningLabelAndHeadingRename(unittest.TestCase):

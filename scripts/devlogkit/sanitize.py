@@ -44,10 +44,35 @@ TEST_PATTERNS = [
 ]
 
 DOCS_PATH_RE = re.compile(r"\.md$", re.IGNORECASE)
+# Phase 2.6 finding: functions/classes/tests are Python/JS/Go-shaped
+# regexes and structurally cannot see the kind of technical work this
+# repo actually does most often — Jekyll layout/include engineering
+# (Liquid + HTML) and stylesheet work (CSS). A day that touches one of
+# these is doing real site-engineering work distinct from ordinary
+# `_articles/*.md` content editing, even when it adds no function/class/
+# test the existing regexes can recognize. Path-based only (no new content
+# read beyond what build_sanitized_summary already gathers per file), so
+# it adds no new secret-exposure surface.
+#
+# Deliberately does NOT include `templates/` (an independent review's
+# BLOCKER finding): this repo's `templates/` directory holds a Markdown
+# authoring aid (`templates/article-template.md`), not Liquid/HTML site
+# engineering — including it here would have both mis-described what the
+# signal means AND (since it's a `.md` file) doubled up with the Markdown
+# extraction branch below on the exact same file. `_layouts/`/`_includes/`
+# hold only `.html` in this repo, so no such overlap exists for them — but
+# see the `not is_markdown` guard at the call site for a defense that
+# holds even if that ever changes.
+STRUCTURAL_PATH_RE = re.compile(r"^(_layouts/|_includes/)|\.(css|scss|sass|less)$", re.IGNORECASE)
 # Lines that are structural Markdown (headings, code fences, list markers
-# for non-prose, front matter delimiters) are excluded from the "prose
-# excerpt" — only plain sentences are quoted.
-MD_STRUCTURAL_RE = re.compile(r"^\+\s*(#{1,6}\s|```|---\s*$|\|.*\|$|\{:.*\}\s*$)")
+# for non-prose, front matter delimiters, GFM task-list checkboxes) are
+# excluded from the "prose excerpt" — only plain sentences are quoted.
+# Task-list markers (`- [ ]`/`- [x]`) specifically (Phase 2.6, independent
+# review): this site's kramdown config has no GFM extension enabled, so
+# quoting one verbatim would render as literal "[ ]" text rather than a
+# checkbox — and out of context, a checklist item read as if it were prose
+# is also just confusing to a reader regardless of rendering.
+MD_STRUCTURAL_RE = re.compile(r"^\+\s*(#{1,6}\s|```|---\s*$|\|.*\|$|\{:.*\}\s*$|[-*]\s*\[[ xX]\]\s)")
 # Recognizes an added Markdown H2/H3 heading's TEXT (separate from
 # MD_STRUCTURAL_RE, which excludes headings from prose excerpts — this
 # captures them instead, as a distinct "section added" signal; see
@@ -58,6 +83,16 @@ HEADING_RE = re.compile(r"^\+\s*#{2,3}\s+(.+?)\s*$")
 # was added/removed/context — a fence opened by an unchanged context line
 # still means added lines under it are code, not prose).
 FENCE_DELIMITER_RE = re.compile(r"^[+\- ]\s*```")
+# HTML comment open/close, tracked the same way as code fences (Phase 2.6
+# finding, independent review): an author-facing instruction comment in a
+# template file — e.g. templates/article-template.md's multi-line
+# `<!-- 読者の課題解決に必要な場合のみ。... -->` guidance for whoever fills
+# the template in — was being quoted as if it were reader-facing
+# documentation prose, because a single-line "is this mostly markup"
+# check can't see that the FIRST line of a multi-line comment has no
+# closing `-->` on it yet.
+HTML_COMMENT_OPEN_RE = re.compile(r"<!--")
+HTML_COMMENT_CLOSE_RE = re.compile(r"-->")
 # An added line that IS a heading at ANY level (# through ######), used to
 # detect a heading-LEVEL-only rename (see _extract_headings): if a hunk
 # removes "# X" and adds "## X", that's a formatting change to an existing
@@ -203,6 +238,7 @@ def _extract_docs_excerpt(lines):
     for hunk in _group_by_hunk(lines):
         prose = []
         in_fence = False
+        in_html_comment = False
         for line in hunk:
             if FENCE_DELIMITER_RE.match(line):
                 in_fence = not in_fence
@@ -214,6 +250,18 @@ def _extract_docs_excerpt(lines):
             if not line.startswith("+") or line.startswith("+++"):
                 if prose:
                     break  # a removed/context line ends this paragraph run
+                continue
+            if in_html_comment:
+                if HTML_COMMENT_CLOSE_RE.search(line):
+                    in_html_comment = False
+                if prose:
+                    break
+                continue
+            if HTML_COMMENT_OPEN_RE.search(line):
+                if not HTML_COMMENT_CLOSE_RE.search(line, line.find("<!--")):
+                    in_html_comment = True  # opens but doesn't close on this line
+                if prose:
+                    break
                 continue
             if MD_STRUCTURAL_RE.match(line) or FRONTMATTER_LINE_RE.match(line) or INTERNAL_LABEL_LINE_RE.match(line):
                 if prose:
@@ -347,6 +395,7 @@ def build_sanitized_summary(repo_path, commit, files):
     docs_excerpts = []
     headings_added = []
     config_keys_changed = []
+    structural_files_changed = []
     per_file_signals = []  # [{"path", "functions", "classes", "tests", "headings", "config_keys"}]
     evidence = []
     behavior_before = None
@@ -388,6 +437,24 @@ def build_sanitized_summary(repo_path, commit, files):
         # (the bug FRONTMATTER_LINE_RE alone could not catch; see the
         # HUNK_HEADER_RE docstring above).
         is_markdown = DOCS_PATH_RE.search(path)
+
+        # Mutually exclusive with the Markdown extraction branch below BY
+        # CONSTRUCTION (not just by regex construction) — an independent
+        # review (Phase 2.6) found that `templates/` (originally part of
+        # STRUCTURAL_PATH_RE) overlapped with `is_markdown` on this repo's
+        # actual `templates/article-template.md`, letting one file change
+        # feed structural_files_changed (Technical Depth) AND
+        # config_keys_changed/headings_added (Development Value/Reader
+        # Value) at once. `templates/` was removed from the regex for
+        # being conceptually wrong here anyway (it holds an authoring
+        # aid, not Liquid/HTML site engineering) — but this `not
+        # is_markdown` guard is the actual, robust fix: it holds even if
+        # the regex is broadened later to something that could also be a
+        # Markdown path.
+        if STRUCTURAL_PATH_RE.search(path) and not is_markdown and path not in structural_files_changed:
+            structural_files_changed.append(path)
+            evidence.append(f"{commit['hash'][:7]}:{path} (structural layout/template/stylesheet file changed)")
+
         body_lines = lines
         frontmatter_range = None
         file_headings, file_keys = [], []
@@ -449,6 +516,7 @@ def build_sanitized_summary(repo_path, commit, files):
         "docs_excerpts": docs_excerpts[:3],
         "headings_added": headings_added[:MAX_ITEMS_PER_LIST],
         "config_keys_changed": config_keys_changed[:MAX_ITEMS_PER_LIST],
+        "structural_files_changed": structural_files_changed[:MAX_ITEMS_PER_LIST],
         "per_file_signals": per_file_signals,
         "behavior_before": behavior_before,
         "behavior_after": behavior_after,
@@ -464,13 +532,15 @@ def merge_day_summaries(commit_summaries):
     merged = {
         "functions_added": [], "classes_added": [], "tests_added": [],
         "docs_excerpts": [], "headings_added": [], "config_keys_changed": [],
+        "structural_files_changed": [],
         "evidence": [], "files_skipped_for_safety": [],
         "behavior_pairs": [], "per_file_signals": [],
     }
     for s in commit_summaries:
         for key in (
             "functions_added", "classes_added", "tests_added", "docs_excerpts",
-            "headings_added", "config_keys_changed", "evidence", "files_skipped_for_safety",
+            "headings_added", "config_keys_changed", "structural_files_changed",
+            "evidence", "files_skipped_for_safety",
         ):
             for item in s[key]:
                 if item not in merged[key]:

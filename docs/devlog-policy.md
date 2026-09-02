@@ -655,3 +655,148 @@ DRAFT_ONLY判定の記事で実証した(AUTO_PUBLISH_CANDIDATEは29節のとお
   「変更前後」としてペア化される可能性が理論上残る。狭いcontext(`-U1`)かつ複数条件が
   同時に揃う必要がある稀なケースであり、次ラウンドで`_filter_out_frontmatter_lines`の
   削除行側にも同様の範囲追跡を拡張することを推奨する
+
+# Phase 2.6: Technical Depth軸の拡張(2026-09-03〜)
+
+Phase 2.5の結論(29節)は「10日間でAUTO_PUBLISH_CANDIDATEが0件」だった。原因分析の柱は
+「Technical Depth軸がPython/JS/Go向けのfunctions/classes/tests正規表現しか見ておらず、
+このリポジトリの実作業(記事執筆・Jekyllのlayout/include/stylesheet engineering)を
+正しく評価できていない」という点だった。Phase 2.6はこの1点に絞って改善する
+(**閾値80点は変更していない**)。
+
+## 32. `structural_files_changed`シグナルの追加
+
+`scripts/devlogkit/sanitize.py`に`STRUCTURAL_PATH_RE`(`_layouts/`・`_includes/`
+プレフィックス、または`.css`/`.scss`/`.sass`/`.less`拡張子)を追加し、該当パスへの変更を
+`structural_files_changed`として記録する(ファイルパスのみ。新たな内容読み取りは発生
+せず、既存のdenylist/secret-scanゲートを通過した後にのみ判定する)。`score.py`の
+`score_technical_depth()`はこれを5つ目のシグナル種別として扱う
+(functions/classes/tests/behavior_pairs/structural_files_changed、各4点・上限20点。
+Phase 2.5で`config_keys_changed`を除外した際の4種×5点から、5種×4点へ戻す形になる)。
+
+### 独立レビューで見つかった問題と修正
+
+1回目のレビューでコード自体は「orthogonal(既存4軸と重複しない)」と主張していたが、
+2回目のレビューで**この主張が実際には誤りだった**ことが判明した。
+
+- **[BLOCKER→修正済み]** 当初`STRUCTURAL_PATH_RE`には`templates/`も含めていたが、
+  このリポジトリの`templates/article-template.md`は実際にはMarkdownの執筆補助
+  ファイル(frontmatter・見出しのひな形)であり、`DOCS_PATH_RE`(`.md$`)の抽出経路とも
+  一致する。そのため同じファイルの変更が、Technical Depth(`structural_files_changed`)
+  と、Development Value/Reader Value(`config_keys_changed`/`headings_added`経由)の
+  複数軸に同時加点されうる状態になっていた。これは27節で確立した「1シグナル・1軸」
+  原則への明確な違反であり、BLOCKERとして修正した: `templates/`をシグナル定義から
+  削除(このリポジトリの`templates/`はLiquid/HTMLのsite engineeringではなく
+  Markdown執筆補助のため、概念的にも対象外が正しい)、かつ`build_sanitized_summary`側で
+  `structural_files_changed`の判定を「`is_markdown`ではない」という条件で明示的に排他化
+  した(将来正規表現が拡張されても軸の独立性が壊れない防御)。統合テスト
+  (`test_markdown_template_file_does_not_double_count_across_axes`)で回帰を確認。
+- **[MAJOR→対応済み]** 4種×5点→5種×4点への再配分は、`structural_files_changed`を
+  **持たない**日にとっては純減(既存シグナルが4種そろっていた日はTechnical Depthが
+  20点から16点に下がる)。1回目の報告が「2日改善」のみを強調し、この副作用による
+  下落を開示していなかった点を指摘され、34節に全10日分の増減を包み隠さず記載した
+  (2026-08-30が-3点で最大の下落。ただしdecisionが変わった日〈DRAFT_ONLY→SKIPなど〉は
+  ない)
+
+## 33. 生成記事の品質修正(独立レビュー、記事内容)
+
+`structural_files_changed`の追加でAUTO_PUBLISH_CANDIDATEに達した2026-08-08・
+2026-08-20の生成記事を独立レビューした結果、コードとは別に以下を発見・修正した。
+
+- **[MAJOR→修正済み] description/primary_keywordがtitleと不統一**: titleは
+  `ja.py`翻訳が成功していれば日本語化される一方、description・primary_keywordは
+  常に英語のcommit subject・day_type定数をそのまま埋め込んでいた(例:
+  「収益化分析基盤を開始しました」というtitleに対し、descriptionは「...launch
+  monetization and analytics foundation。」と英語のまま)。titleと同じ翻訳判定
+  (`ja.coverage_is_usable`)をdescription・primary_keywordにも適用する
+  `templates.translated_or_original()`を新設し、翻訳できた場合は両方とも日本語に、
+  できない場合はtitle同様に元の英語のまま(誠実なフォールバックとして維持)。
+  `primary_keyword`のday_typeラベルも`classify.DAY_TYPE_JA_LABEL`辞書で日本語化した
+  (例: `feature`→「新機能」)
+- **[MAJOR→修正済み] Markdownタスクリスト行(`- [ ] ...`)が抜粋に混入**:
+  `docs/publish-checklist.md`のチェックリスト項目が、フレーミングなしで
+  「README/ドキュメントの追記内容」として提示されていた。このサイトのkramdown設定は
+  GFM拡張が無効なため、実際のビルドでは`[ ]`がチェックボックスとして描画されず文字通り
+  残ってしまう可能性も指摘された。`- [ ]`/`- [x]`で始まる行を構造的Markdownとして
+  抜粋対象から除外する形で解決(フレーミング文を追加する案もあったが、単純除外の方が
+  余計な内部プロセスの露出を増やさず、Step7の方針とも整合する)
+- **[新規発見→修正済み] 複数行HTMLコメントが抜粋に混入**: 上記の修正で最初の候補行が
+  除外された結果、次点の候補として`templates/article-template.md`内の複数行HTML
+  コメント(`<!-- 読者の課題解決に必要な場合のみ...``-->`、執筆者向けの記入ガイド)の
+  1行目が抜粋されてしまう新たな問題が発生した。1行単位のmarkup判定では、複数行コメントの
+  開始行(その行だけでは閉じタグ`-->`がない)を検出できないことが原因。コードフェンスと
+  同様の「複数行にまたがる状態追跡」(`in_html_comment`)を追加し解決した
+
+いずれも、独立レビューを2回実施したことで「1回目の修正が新たな問題を生む」連鎖を
+検出でき、2回目で収束させた(quality-developmentのIterative Refinement運用どおり)。
+
+## 34. 10日分の実データ再評価(Phase 2.5→Phase 2.6、全日程を開示)
+
+| 日付 | Phase 2.5 | Phase 2.6 | 差分 | 判定変化 |
+|---|---|---|---|---|
+| 2026-08-06 | 67 DRAFT_ONLY | 70 DRAFT_ONLY | +3 | なし |
+| 2026-08-07 | 53 SKIP | 56 SKIP | +3 | なし |
+| 2026-08-08 | 79 DRAFT_ONLY | **82 AUTO_PUBLISH_CANDIDATE** | +3 | **昇格** |
+| 2026-08-12 | 64 DRAFT_ONLY | 70 DRAFT_ONLY | +6 | なし |
+| 2026-08-20 | 79 DRAFT_ONLY | **81 AUTO_PUBLISH_CANDIDATE** | +2 | **昇格** |
+| 2026-08-21 | 61 DRAFT_ONLY | 60 DRAFT_ONLY | -1 | なし |
+| 2026-08-22 | 67 DRAFT_ONLY | 66 DRAFT_ONLY | -1 | なし |
+| 2026-08-23 | (dedup) SKIP | (dedup) SKIP | - | なし |
+| 2026-08-24 | 69 DRAFT_ONLY | 68 DRAFT_ONLY | -1 | なし |
+| 2026-08-30 | 79 DRAFT_ONLY | 76 DRAFT_ONLY | -3 | なし |
+
+3日(21・22・24・30)がわずかに下落しているが、いずれもdecisionの区分(SKIP/DRAFT_ONLY/
+AUTO_PUBLISH_CANDIDATE)は変わっていない。下落の原因は32節のとおり「4種×5点→5種×4点」
+の再配分そのもの(`structural_files_changed`を持たない日の純減)であり、隠さずここに
+記載する。2026-08-08・2026-08-20の2日は、実際に`_layouts/`・`_includes/`・CSSファイルを
+含む実質的なsite engineering作業を伴っており、スコア上昇は実データに裏付けられている
+(狙い撃ちでの調整ではない。設計〈32節〉は数値を見る前に決めており、その後の実測で
+たまたま2日が閾値を超えた)。
+
+## 35. AUTO_PUBLISH_CANDIDATE 2件の内容評価
+
+- **2026-08-08**(82点): Phase 2.5で既にBLOCKER(内部SEOラベル漏洩)を検出・修正済みの
+  記事。今回の再生成でも内容は同一(スコアのみ変化)。評価: **B**(可読・事実に忠実・
+  ハルシネーションなし。title/description/primary_keywordの機械的な言い回しは
+  引き続き軽微な課題として残る)
+- **2026-08-20**(81点): 独立レビューでBLOCKER相当ではないが複数のMAJORを検出
+  (上記33節)。すべて修正済み。修正後の内容を確認し、評価: **B**(ハルシネーション・
+  秘密情報漏洩なし。断片的な情報〈ファイル別の変更点〉を一文でまとめる「橋渡し文」が
+  ないため、読者が自力で意味を再構成する必要がある点が指摘されたが、これは意図的な
+  設計トレードオフ〈36節〉であり、単純な編集不足ではない)
+
+両記事ともAUTO_PUBLISH_CANDIDATE(score≥80)かつグレードB(軽微な編集で公開可能)に
+到達した。Step14の成功条件(score≥80 AND A評価)には「A評価」の部分が届いていないが、
+これはタイトル・descriptionの完全な自然文生成にLLM等の追加ステップを要する(hallucination
+リスクを避けるため意図的に不採用)という、Phase 2で既知としていた制約に起因するもので
+あり、Phase 2.6の範囲(Technical Depth軸の是正)を超える。
+
+## 36. 既知の設計上のトレードオフ: 断片の要約文を生成しない
+
+独立レビューで「ファイル別の変更点が断片の羅列で終わり、何が実現されたかをまとめる
+一文がない」という指摘を受けたが、これは意図的な設計判断として維持する。変更ファイル
+群から「①GA4導入、②プライバシーポリシー整備、③OGP画像対応」のような要約文を機械的に
+合成することは、複数の断片から「意味のグルーピング」を推論する行為であり、Step8の
+Factルール(体験・理由・効果の創作禁止)が禁じる「確認できない解釈の付加」に近づく
+リスクがある。現状は「事実の列挙に留め、解釈は人に委ねる」設計を優先しており、この
+トレードオフをここに明記する(将来、ルールベースの安全な要約手法が設計できれば
+再検討の余地がある)。
+
+## 37. 31節の未解決事項の状況
+
+- **Evidence Strength軸の他軸との重複**: 未着手のまま(次ラウンド送り)。ただし
+  `EVIDENCE_TYPE_SUFFIXES`に`structural_files_changed`用の1種を追加したため、
+  この軸への依存はわずかに増えている。実測では2026-08-08・2026-08-20とも
+  Evidence Strengthは追加前後で20点(上限)のまま変化がなく、今回の変更による
+  実害(実際のスコア押し上げ)は確認されなかったが、設計上の重複自体は解消されて
+  いないため、次ラウンドでの再設計が引き続き必要
+- **`_extract_single_line_replacement`のfrontmatter境界問題**: 未着手のまま
+  (次ラウンド送り)
+
+## 38. Promotion E2E実証(実データ、実験後に削除)
+
+2026-08-08・2026-08-20どちらも、AUTO_PUBLISH_CANDIDATEとして`mark-devlog-reviewed.py
+--pass`でレビュー記録→tamper攻撃(本文への1文追加)で拒否を確認→未改変の場合は
+`promote-devlog.py`が成功(Fact Gate・Content Fingerprint・Security/Privacy再スキャン
+すべて通過)→実験後に`_articles/`・`drafts/`から削除、を実施した。手順・結果は
+30節と同型のため、ここでは差分のみ記載する。

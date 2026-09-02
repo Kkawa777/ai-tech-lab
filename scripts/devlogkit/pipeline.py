@@ -108,12 +108,19 @@ def run(project_key: str, entry: dict, repo_path: Path, date_str: str) -> Pipeli
     body = templates.render_body(day_type, display_name, notable, merged_summary)
 
     subjects_cleaned = [templates.clean_subject(c["subject"]) for c in notable]
+    # Phase 2.6: translate each subject independently for the description
+    # (falling back to the original English per-subject, not per-day, when
+    # a given subject doesn't meet ja.coverage_is_usable()) — previously
+    # this always embedded the raw English subjects verbatim even when the
+    # title above translated cleanly, which an independent review flagged
+    # as an inconsistency that reads like a generation bug.
+    subjects_for_description = [templates.translated_or_original(s)[0] for s in subjects_cleaned]
     description = (
         f"{date_str}に{display_name}リポジトリで行われた開発のログです。"
-        f"Git履歴とdiffから確認できる変更: {'、'.join(subjects_cleaned[:5])}"
-        f"{f' ほか{len(subjects_cleaned) - 5}件' if len(subjects_cleaned) > 5 else ''}。"
+        f"Git履歴とdiffから確認できる変更: {'、'.join(subjects_for_description[:5])}"
+        f"{f' ほか{len(subjects_for_description) - 5}件' if len(subjects_for_description) > 5 else ''}。"
     )
-    primary_keyword = f"{display_name} {day_type}" if day_type != classify.GENERIC else f"{display_name} 開発ログ"
+    primary_keyword = f"{display_name} {classify.DAY_TYPE_JA_LABEL.get(day_type, '開発ログ')}"
     social_summary = title[:140]
 
     screenshot_candidates = screenshots.discover_candidates(repo_path, date_str)

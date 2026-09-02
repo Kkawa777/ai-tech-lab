@@ -21,6 +21,36 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
 
 ## Completed
 
+- Dev Log自動化 Phase 2.6(Technical Depth軸拡張)完了。目的: Phase 2.5が「AUTO_PUBLISH_
+  CANDIDATE 0件」の主因とした、Technical Depth軸がPython/JS/Go向けfunctions/classes/tests
+  正規表現しか見ておらずこのリポジトリの実作業(記事執筆・Jekyll layout/include/
+  stylesheet engineering)を評価できていない問題を是正する(閾値80点は変更禁止)。変更:
+  `scripts/devlogkit/sanitize.py`(`structural_files_changed`シグナル新設、`_layouts/`・
+  `_includes/`・CSS系拡張子のみ対象、`not is_markdown`で他軸との排他性を保証。GFM
+  タスクリスト行・複数行HTMLコメントのdocs抜粋除外も追加)、`score.py`
+  (`score_technical_depth`を5種×4点に再配分)、`classify.py`(`DAY_TYPE_JA_LABEL`辞書で
+  primary_keywordの日本語化)、`templates.py`(`translated_or_original`でdescription/
+  primary_keywordもtitleと同じ翻訳判定を通す)、`pipeline.py`(上記の呼び出し側統合)。
+  `docs/devlog-policy.md`32-38節に追記。independent-reviewerをコード2サイクル・生成記事
+  1サイクル実施(1周目コード: 一部の設計主張を暫定OKと判定、2周目コード: BLOCKER1
+  [`templates/`が`is_markdown`抽出経路と重複し他軸二重加点]・MAJOR2[4→5種の再配分による
+  一部日の退行が未開示・devlog-policy.md未更新]を検出→修正、記事: BLOCKER0だが
+  「81点/AUTO_PUBLISH_CANDIDATE」がdevlog-policy.mdの旧記述と矛盾〈ドキュメント未更新が
+  原因、指摘3と同根〉・MAJOR2[description/primary_keywordの未翻訳一貫性欠如、
+  Markdownタスクリスト行の無framing混入]を検出→修正。修正の過程でタスクリスト行の
+  除外が別の潜在バグ(複数行HTMLコメントの1行目が次点候補として混入)を顕在化させ、
+  追加修正)。`scripts/test_devlog.py`58/58 PASS(構造ファイル信号・タスクリスト/
+  HTMLコメント除外・description翻訳一貫性・テンプレート二重加点防止の回帰テストを追加)、
+  `validate-site.py`全項目PASS、`git diff --check`問題なし。**結論**: 10日間の実データ
+  再評価で2026-08-08(82点)・2026-08-20(81点)が新たにAUTO_PUBLISH_CANDIDATEへ到達
+  (79点だった3日のうち2日。閾値は変更していない)。両記事とも独立レビュー修正後に
+  グレードB(可読・事実に忠実・ハルシネーションなし。title/description等の完全な自然文
+  生成、および断片の要約文非生成という設計トレードオフのみ残存)。Promotion E2E・
+  tamper-attack実証を両記事で実施(reviewer_status: pass記録→改変コピーは拒否→
+  未改変オリジナルはFact Gate含む全ゲート通過で`_articles/`昇格に成功→実験後に削除、
+  本番`_articles/`/`drafts/`に残留物なしを確認)。**READY_FOR_PHASE_3の再判定は次の
+  commit/push完了後に実施**。§31から持ち越しの未解決MAJOR2件(Evidence Strength軸の
+  重複、frontmatter境界のペアリング問題)は引き続き次ラウンド送り
 - Dev Log自動化 Phase 2.5(Auto-Publish Readiness Sprint)完了。目的: 「Gitから生成した
   記事が人の手直しなしで公開候補になる」ことを実データで証明する(閾値80点は変更禁止)。
   変更: `scripts/devlogkit/`の`sanitize.py`(見出し/設定キー/README抜粋の抽出・帰属を
