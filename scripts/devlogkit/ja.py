@@ -16,6 +16,17 @@ too low to produce something readable.
 """
 import re
 
+# Common tech acronyms that must render fully UPPERCASE, not
+# `.capitalize()`'d (Phase 2.7 finding, independent review: an unmapped
+# token falls through to title-casing as a generic "probably a proper
+# noun" guess, which mangles a real acronym — e.g. "ide" -> "Ide",
+# "css" -> "Css", "github" -> "Github"). Generic web/software vocabulary,
+# not tied to any specific project.
+KNOWN_ACRONYMS = {
+    "css", "html", "ide", "github", "url", "http", "https",
+    "json", "yaml", "xml", "sql", "cli", "sdk", "cdn",
+}
+
 # Checked BEFORE single-token lookup, longest first, case-insensitive,
 # against the whole cleaned subject. This is where repo-specific /
 # domain-specific vocabulary lives (the single-token dictionary below is
@@ -33,7 +44,15 @@ MULTI_WORD_OVERRIDES = [
     ("analytics foundation", "分析基盤"),
 ]
 
-STOPWORDS = {"to", "for", "in", "with", "from", "of", "the", "a", "an", "on", "and"}
+STOPWORDS = {"to", "for", "in", "with", "from", "of", "the", "a", "an", "on"}
+# "and" is deliberately NOT a plain stopword (Phase 2.7 finding): silently
+# dropping it collapsed "X and Y" into one run-on compound noun — e.g.
+# "site layout and article presentation" -> "サイトレイアウト記事プレゼン
+# テーション", four nouns fused with no separator, unreadable even though
+# each individual noun was correctly mapped. It's tracked through
+# tokenization as a JOIN_MARKER and rendered as "・" between the two
+# concept groups it separates, instead of being deleted outright.
+JOIN_MARKER = "__AND__"
 
 # Verbs get a polite past-tense Japanese suffix so a title reads as an
 # action taken, matching this site's existing article title tone.
@@ -130,7 +149,8 @@ MAX_TRANSLATABLE_TOKENS = 5
 
 
 def translate_subject(cleaned_subject):
-    """Returns (japanese_ish_title_fragment, coverage_ratio, token_count).
+    """Returns (japanese_ish_title_fragment, coverage_ratio, token_count,
+    object_phrase_only).
 
     coverage_ratio in [0, 1]: fraction of tokens that were either mapped
     via the dictionary or matched a multi-word override. token_count is
@@ -138,23 +158,41 @@ def translate_subject(cleaned_subject):
     the object phrase was built from. Both are needed by
     coverage_is_usable() — a low ratio OR too many tokens are each
     independently a sign this output shouldn't be trusted as-is.
+
+    object_phrase_only is the noun/object portion WITHOUT the trailing
+    "を...しました" verb suffix (e.g. "収益化・分析基盤" rather than
+    "収益化・分析基盤を開始しました") — added in Phase 2.7 so callers that
+    need a topic LABEL (e.g. primary_keyword) rather than a full sentence
+    fragment don't have to regex-strip the verb back off the title string.
     """
     lowered = cleaned_subject.lower()
     remaining, ja_fragments = _apply_multi_word_overrides(lowered)
 
     raw_tokens = re.findall(r"[a-z0-9]+|__ja_\d+__", remaining)
-    tokens = [t for t in raw_tokens if t not in STOPWORDS]
-    if not tokens:
-        return cleaned_subject, 0.0, 0
+    tokens = [JOIN_MARKER if t == "and" else t for t in raw_tokens if t not in STOPWORDS]
+    if not tokens or all(t == JOIN_MARKER for t in tokens):
+        return cleaned_subject, 0.0, 0, cleaned_subject
 
     verb = None
     if tokens[0] in VERB_MAP:
         verb = VERB_MAP[tokens[0]]
         tokens = tokens[1:]
+    # A join marker left dangling at either end once the verb (or nothing
+    # else) is stripped isn't separating two concept groups anymore.
+    while tokens and tokens[0] == JOIN_MARKER:
+        tokens = tokens[1:]
+    while tokens and tokens[-1] == JOIN_MARKER:
+        tokens = tokens[:-1]
 
     mapped_count = 0
+    concept_count = 0
     object_parts = []
     for tok in tokens:
+        if tok == JOIN_MARKER:
+            if object_parts and object_parts[-1] != "・":
+                object_parts.append("・")
+            continue
+        concept_count += 1
         m = re.match(r"__ja_(\d+)__", tok)
         if m:
             object_parts.append(ja_fragments[int(m.group(1))])
@@ -164,15 +202,29 @@ def translate_subject(cleaned_subject):
             mapped_count += 1
         elif tok.isdigit() or re.match(r"^[a-z]+\d+$|^\d+[a-z]+$", tok):
             object_parts.append(tok.upper())  # model numbers like esp32 -> ESP32, kept verbatim
+        elif tok in KNOWN_ACRONYMS:
+            object_parts.append(tok.upper())  # css/html/ide/github/... kept verbatim, not title-cased
         else:
-            object_parts.append(tok)
+            # An unmapped word left verbatim is usually a proper noun
+            # (Arduino, GitHub, ...) — `lowered` at the top of this
+            # function lowercased everything for matching purposes, but
+            # rendering it back out still fully lowercase (Phase 2.7
+            # finding: "arduino" sitting lowercase inside an otherwise-
+            # Japanese phrase read as broken) is worse than a reasonable
+            # default guess. Title-casing isn't always correct (an
+            # unmapped common English word stays capitalized too), but a
+            # capitalized unknown word reads as an intentional proper noun
+            # far more often than an all-lowercase one does.
+            object_parts.append(tok.capitalize())
+    if object_parts and object_parts[-1] == "・":
+        object_parts.pop()
 
-    coverage = mapped_count / len(tokens) if tokens else 0.0
+    coverage = mapped_count / concept_count if concept_count else 0.0
     object_phrase = "".join(object_parts)
 
     if verb:
-        return f"{object_phrase}を{verb}", coverage, len(tokens)
-    return object_phrase, coverage, len(tokens)
+        return f"{object_phrase}を{verb}", coverage, concept_count, object_phrase
+    return object_phrase, coverage, concept_count, object_phrase
 
 
 def coverage_is_usable(coverage_ratio, token_count=0):

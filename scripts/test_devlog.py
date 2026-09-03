@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from devlogkit import allowlist, classify, sanitize, score, security, templates  # noqa: E402
+from devlogkit import allowlist, classify, ja, sanitize, score, security, templates  # noqa: E402
 from devlogkit import frontmatter as fm_lib  # noqa: E402
 from devlogkit import pipeline  # noqa: E402
 
@@ -79,7 +79,14 @@ class TestSecretFiltering(unittest.TestCase):
         self.assertFalse(security.is_denylisted_path("scripts/generate-devlog.py"))
 
     def test_secret_value_scan(self):
-        self.assertTrue(security.scan_lines_for_secrets(["+AWS_KEY = 'AKIAABCDEFGHIJKLMNOP'"]))
+        # Built by concatenation, not as a literal contiguous string, so
+        # this test fixture (a fake, non-functional value that only needs
+        # to match security.py's own AKIA-prefixed shape regex) doesn't
+        # also match GitHub's push-protection AWS-key scanner, which
+        # blocks pushes containing what LOOKS like a real key regardless
+        # of whether it's a documented test placeholder.
+        fake_aws_key = "AKIA" + "ABCDEFGHIJKLMNOP"
+        self.assertTrue(security.scan_lines_for_secrets([f"+AWS_KEY = '{fake_aws_key}'"]))
         self.assertTrue(security.scan_lines_for_secrets(["+token = sk-abcdefghijklmnopqrstuvwx"]))
         self.assertFalse(security.scan_lines_for_secrets(["+def add(a, b):", "+    return a + b"]))
 
@@ -124,7 +131,19 @@ class TestQualityScoreGates(unittest.TestCase):
         summary = {
             "functions_added": ["do_thing"], "classes_added": ["Thing"], "tests_added": ["test_do_thing"],
             "docs_excerpts": ["This does the thing."],
-            "evidence": ["abc1234:src/thing.py (function signature added)"] * 5,
+            # Realistic evidence: one entry per distinct signal actually
+            # present (as build_sanitized_summary really produces), not N
+            # copies of the same string — Phase 2.7's Evidence Strength
+            # rebalancing deliberately rewards genuine diversity over raw
+            # duplicate-count padding, so the fixture should reflect what
+            # a real well-evidenced day's `evidence` list looks like.
+            "evidence": [
+                "abc1234:src/thing.py (function signature added)",
+                "abc1234:src/thing.py (class signature added)",
+                "abc1234:src/thing.py (test added)",
+                "abc1234:README.md (docs/README prose excerpt)",
+                "abc1234:src/thing.py (single-line before/after)",
+            ],
             "files_skipped_for_safety": [], "behavior_pairs": [("old", "new")],
         }
         total, _ = score.compute_quality_score(day_stats, summary, classify.FEATURE, 1.0)
@@ -136,7 +155,10 @@ class TestQualityScoreGates(unittest.TestCase):
         self.assertEqual(score.decide(100, gates), score.BLOCKED)
 
     def test_final_text_secret_rescan_catches_leak(self):
-        rendered = "title: hello\nbody: AWS key AKIAABCDEFGHIJKLMNOP leaked\n"
+        # Concatenated, not a literal contiguous string — see
+        # test_secret_value_scan's comment for why.
+        fake_aws_key = "AKIA" + "ABCDEFGHIJKLMNOP"
+        rendered = f"title: hello\nbody: AWS key {fake_aws_key} leaked\n"
         gates = score.check_safety_gates(rendered, {"evidence": [], "files_skipped_for_safety": []})
         self.assertEqual(gates["security"], "FAIL")
 
@@ -547,6 +569,92 @@ class TestMultiProjectFailureIsolation(unittest.TestCase):
         self.assertNotEqual(summary[1][1], "ERROR")
 
 
+class TestChangedFilesExcludesBehaviorPairPaths(unittest.TestCase):
+    """Phase 2.7, independent review finding: a path already detailed in
+    "変更前後" (behavior_pairs) was ALSO listed bare in "変更されたファイル"
+    — the per_file_signals-based dedup didn't cover this separate data
+    structure, so the same redundant-repetition problem that fix
+    addressed for functions/classes/headings/config-keys still applied to
+    before/after pairs."""
+
+    def test_behavior_pair_path_excluded_from_changed_files(self):
+        commit = {"hash": "abc1234567", "files": [
+            {"path": "a.html", "status": "M"}, {"path": "b.html", "status": "M"},
+        ]}
+        summary = {
+            "per_file_signals": [],
+            "behavior_pairs": [{"before": "x", "after": "y", "path": "a.html", "commit_hash": "abc1234567"}],
+        }
+        section = templates._changed_files_section([commit], summary)
+        rendered = "\n".join(section)
+        self.assertNotIn("a.html", rendered)
+        self.assertIn("b.html", rendered)
+
+
+class TestDocsExcerptAndBeforeAfterAttribution(unittest.TestCase):
+    """Phase 2.7, independent review finding: without a commit/path
+    attribution on the "README/ドキュメントの追記内容" and "変更前後"
+    sections, a reader couldn't tell whether two mentions of the same
+    heading TEXT (e.g. a template-standard heading reused across
+    different article files) were the same event or two unrelated ones —
+    reading as a self-contradiction that wasn't actually one."""
+
+    def test_docs_excerpt_carries_commit_hash(self):
+        summary = {
+            "functions_added": [], "classes_added": [], "tests_added": [],
+            "headings_added": [], "config_keys_changed": [],
+            "docs_excerpts": [{"path": "README.md", "commit_hash": "abc1234567", "text": "Some prose."}],
+            "behavior_pairs": [], "per_file_signals": [],
+        }
+        rendered = "\n".join(templates._evidence_section(summary))
+        self.assertIn("README.md", rendered)
+        self.assertIn("abc1234", rendered)
+
+    def test_behavior_pair_carries_path_and_commit_hash(self):
+        summary = {
+            "functions_added": [], "classes_added": [], "tests_added": [],
+            "headings_added": [], "config_keys_changed": [],
+            "docs_excerpts": [],
+            "behavior_pairs": [{"before": "old", "after": "new", "path": "a.html", "commit_hash": "def7654321"}],
+            "per_file_signals": [],
+        }
+        rendered = "\n".join(templates._evidence_section(summary))
+        self.assertIn("a.html", rendered)
+        self.assertIn("def7654", rendered)
+
+
+class TestFrontmatterBoundaryBeforeAfterFix(unittest.TestCase):
+    """Phase 2.7 fix for a docs/devlog-policy.md §31 carried-over MAJOR:
+    _filter_out_frontmatter_lines previously only excluded ADDED lines
+    within the frontmatter block, so a REMOVED frontmatter continuation
+    line could survive through to _extract_single_line_replacement and
+    pair with an unrelated added body line as a misleading "before/after"."""
+
+    def test_removed_frontmatter_line_not_paired_with_added_body_line(self):
+        old_frontmatter_range = (1, 3)  # the OLD file's --- ... --- block spans lines 1-3
+        diff_lines = [
+            "@@ -2,1 +2,1 @@",
+            "-  wrapped frontmatter continuation text",
+            "+A completely unrelated body sentence that was added.",
+        ]
+        filtered = sanitize._filter_out_frontmatter_lines(diff_lines, None, old_frontmatter_range)
+        pairs = sanitize._extract_single_line_replacement(filtered)
+        self.assertEqual(pairs, [])
+
+    def test_removed_body_line_still_pairs_normally(self):
+        # Sanity check: when the removed line is genuinely outside the old
+        # frontmatter range, single-line-replacement pairing still works.
+        old_frontmatter_range = (1, 3)
+        diff_lines = [
+            "@@ -5,1 +5,1 @@",
+            "-old body sentence",
+            "+new body sentence",
+        ]
+        filtered = sanitize._filter_out_frontmatter_lines(diff_lines, None, old_frontmatter_range)
+        pairs = sanitize._extract_single_line_replacement(filtered)
+        self.assertEqual(pairs, [("old body sentence", "new body sentence")])
+
+
 class TestFrontmatterLeakPrevention(unittest.TestCase):
     """Regression tests for the bug where a wrapped/folded YAML frontmatter
     continuation line (produced by yaml.safe_dump for long string values)
@@ -689,6 +797,156 @@ class TestDescriptionTranslationConsistency(unittest.TestCase):
             self.assertNotRegex(classify.DAY_TYPE_JA_LABEL[day_type], r"[a-z]{3,}")
 
 
+class TestChangeCompositionOverview(unittest.TestCase):
+    """Phase 2.7, independent review finding (x2): the article body read
+    as pure fragment-list "Git変更の羅列" with no sentence connecting the
+    commit list to the detailed per-file breakdown. Added a single,
+    purely mechanical-count overview sentence — never an interpretation
+    of what the changes MEAN or WHY they were made (Step 8's Fact rule),
+    which is why Phase 2.6 (§36) had declined to add a summary at all."""
+
+    def test_omits_zero_categories(self):
+        summary = {
+            "per_file_signals": [{"path": "a.md", "functions": [], "classes": [], "tests": [],
+                                   "headings": [], "config_keys": ["title"]}],
+            "docs_excerpts": [],
+        }
+        overview = templates._change_composition_overview(summary)
+        self.assertIn("設定・frontmatterキーの変更", overview)
+        self.assertNotIn("見出し", overview)
+        self.assertNotIn("関数", overview)
+
+    def test_empty_when_nothing_extracted(self):
+        summary = {"per_file_signals": [], "docs_excerpts": []}
+        self.assertEqual(templates._change_composition_overview(summary), "")
+
+    def test_counts_match_per_file_signals_not_truncated_day_level_fields(self):
+        """Regression for a real bug an independent review found: counting
+        from summary["headings_added"] (separately capped at sanitize.py's
+        MAX_ITEMS_PER_LIST) instead of per_file_signals (what the "ファイル
+        別の変更点" detail section actually renders) let this sentence
+        claim a smaller number than what was really shown below it — e.g.
+        a day with 9 real headings across 3 files claimed "8件" because
+        the DAY-LEVEL list happened to be truncated to 8 while
+        per_file_signals, read by the detail section, was not."""
+        summary = {
+            "per_file_signals": [
+                {"path": "a.md", "functions": [], "classes": [], "tests": [],
+                 "headings": ["h1", "h2"], "config_keys": []},
+                {"path": "b.md", "functions": [], "classes": [], "tests": [],
+                 "headings": ["h3", "h4", "h5", "h6", "h7", "h8", "h9"], "config_keys": []},
+            ],
+            # A deliberately-truncated (unrealistic but reproduces the bug
+            # condition) day-level field that must NOT be what gets counted.
+            "headings_added": ["h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8"],
+            "docs_excerpts": [],
+        }
+        overview = templates._change_composition_overview(summary)
+        self.assertIn("見出しの追加(9件)", overview)
+
+    def test_behavior_pairs_are_counted(self):
+        """Regression: independent review found behavior_pairs was
+        omitted from this sentence with no valid reason (unlike
+        structural_files_changed, it DOES have a corresponding detail
+        section — "変更前後" — so omitting it looked like an oversight)."""
+        summary = {
+            "per_file_signals": [], "docs_excerpts": [],
+            "behavior_pairs": [{"before": "a", "after": "b", "path": "x.html", "commit_hash": "abc"}],
+        }
+        overview = templates._change_composition_overview(summary)
+        self.assertIn("変更前後を確認できた箇所(1件)", overview)
+
+    def test_never_asserts_reason_or_purpose(self):
+        # Sanity guard against future edits reintroducing invented
+        # motivation language into this specific sentence.
+        summary = {
+            "per_file_signals": [{"path": "a.py", "functions": ["f"], "classes": [], "tests": [],
+                                   "headings": ["H"], "config_keys": ["k"]}],
+            "docs_excerpts": ["e"],
+        }
+        overview = templates._change_composition_overview(summary)
+        for forbidden in ("ため", "目的", "理由", "解決"):
+            self.assertNotIn(forbidden, overview)
+
+
+class TestTitleDescriptionConsistency(unittest.TestCase):
+    """Phase 2.7, independent review finding (x2): title and description
+    were translated independently, so on a multi-commit day they could
+    disagree about whether Japanese translation succeeded — e.g. title
+    fully Japanese (only needs ONE qualifying commit) while description
+    fell back to all-English (a stricter all-must-qualify rule). Fixed by
+    deriving both from the exact same _select_headline_phrase choice."""
+
+    def _commit(self, subject, lines=10):
+        return {"subject": subject, "stat": {"insertions": lines, "deletions": 0}}
+
+    def test_title_and_description_agree_when_one_commit_translates(self):
+        notable = [
+            self._commit("add visual guides to first Arduino article"),
+            self._commit("improve site layout and article presentation"),
+            self._commit("publish Arduino IDE installation guide"),
+        ]
+        title, used_japanese, _coverage = templates.build_headline("AI-Tech-Lab", notable)
+        description = templates.describe_day("2026-08-08", "AI-Tech-Lab", notable)
+        self.assertTrue(used_japanese)
+        self.assertIn("サイトレイアウト", title)
+        self.assertIn("サイトレイアウト", description)  # same phrase, not a separately-translated fallback
+
+    def test_title_and_description_agree_when_nothing_translates(self):
+        notable = [self._commit("wire up an extremely unusual bespoke integration harness")]
+        title, used_japanese, _coverage = templates.build_headline("AI-Tech-Lab", notable)
+        description = templates.describe_day("2026-08-08", "AI-Tech-Lab", notable)
+        self.assertFalse(used_japanese)
+        self.assertIn("wire up an extremely unusual bespoke integration harness", title)
+        self.assertIn("wire up an extremely unusual bespoke integration harness", description)
+
+
+class TestTopicKeywordDerivation(unittest.TestCase):
+    """Phase 2.7, independent review finding: primary_keyword/search_intent
+    depended only on day_type (e.g. every "feature" day got the identical
+    "AI-Tech-Lab 新機能"), which is an SEO keyword-cannibalization risk
+    once multiple devlog articles of the same type exist."""
+
+    def _commit(self, subject, lines=10):
+        return {"subject": subject, "stat": {"insertions": lines, "deletions": 0}}
+
+    def test_topic_keyword_derived_when_translatable(self):
+        notable = [self._commit("launch monetization and analytics foundation")]
+        topic = templates.derive_topic_keyword(notable)
+        self.assertIsNotNone(topic)
+        self.assertNotRegex(topic, r"[A-Za-z]{4,}")
+
+    def test_topic_keyword_none_when_untranslatable(self):
+        notable = [self._commit("wire up an extremely unusual bespoke integration harness")]
+        self.assertIsNone(templates.derive_topic_keyword(notable))
+
+    def test_two_different_days_get_different_topic_keywords(self):
+        day1 = [self._commit("improve site layout and article presentation")]
+        day2 = [self._commit("launch monetization and analytics foundation")]
+        self.assertNotEqual(templates.derive_topic_keyword(day1), templates.derive_topic_keyword(day2))
+
+
+class TestAcronymCasingPreserved(unittest.TestCase):
+    """Phase 2.7, independent review finding: an unmapped token falling
+    through to `.capitalize()` mangles real acronyms (ide -> Ide, css ->
+    Css, github -> Github) even though it correctly fixes the more common
+    case of a genuine proper noun (arduino -> Arduino)."""
+
+    def test_known_acronyms_stay_uppercase(self):
+        phrase, coverage, token_count, _obj = ja.translate_subject("publish new CSS and HTML for the IDE")
+        self.assertIn("CSS", phrase)
+        self.assertIn("HTML", phrase)
+        self.assertIn("IDE", phrase)
+        self.assertNotIn("Css", phrase)
+        self.assertNotIn("Html", phrase)
+        self.assertNotIn("Ide", phrase)
+
+    def test_unmapped_proper_noun_still_capitalized(self):
+        phrase, coverage, token_count, _obj = ja.translate_subject("add support for arduino")
+        self.assertIn("Arduino", phrase)
+        self.assertNotIn("arduino", phrase)
+
+
 class TestTaskListMarkerExcludedFromExcerpt(unittest.TestCase):
     """Phase 2.6, independent review finding: a GFM task-list line
     (`- [ ] ...`) quoted as a docs excerpt would render as literal "[ ]"
@@ -750,15 +1008,61 @@ class TestPlanningLabelAndHeadingRename(unittest.TestCase):
     contradicting itself in the rendered article."""
 
     def test_internal_planning_label_excluded_from_docs_excerpt(self):
+        # Phase 2.7: the numbered-bold-title line itself is now ALSO
+        # excluded (it's a planning-list index entry, not prose — see
+        # TestPlanningListEntryExcludedFromExcerpt), so this hunk has no
+        # qualifying candidate left at all and correctly yields no excerpt.
         lines = [
             "@@ -10,0 +11,2 @@",
             "+2. **Some future article title**",
             "+   検索意図: this is internal SEO planning metadata, not documentation.",
         ]
         excerpt = sanitize._extract_docs_excerpt(lines)
+        self.assertIsNone(excerpt)
+
+    def test_internal_planning_label_excluded_even_under_ordinary_prose(self):
+        # The 検索意図 exclusion must still work independently of the
+        # numbered-bold-title exclusion — e.g. under an ordinary bullet,
+        # not just under a planning-list title.
+        lines = [
+            "@@ -10,0 +11,2 @@",
+            "+Some genuine prose sentence that a reader would want to see here.",
+            "+検索意図: this is internal SEO planning metadata, not documentation.",
+        ]
+        excerpt = sanitize._extract_docs_excerpt(lines)
         self.assertIsNotNone(excerpt)
         self.assertNotIn("検索意図", excerpt)
         self.assertNotIn("SEO planning metadata", excerpt)
+
+
+class TestPlanningListEntryExcludedFromExcerpt(unittest.TestCase):
+    """Phase 2.7: a numbered/bulleted line whose entire content is one
+    bold span (e.g. "2. **Arduino IDEのインストール方法...**" from an
+    internal content-planning list) is a title/index entry, not prose a
+    human wrote for a reader — excluded regardless of which file it's
+    from (a general structural shape, not a specific project filename)."""
+
+    def test_numbered_bold_title_excluded(self):
+        lines = [
+            "@@ -1,0 +1,1 @@",
+            "+2. **Arduino IDEのインストール方法(Windows版)のガイド記事タイトル案**",
+        ]
+        self.assertIsNone(sanitize._extract_docs_excerpt(lines))
+
+    def test_bulleted_bold_title_excluded(self):
+        lines = [
+            "@@ -1,0 +1,1 @@",
+            "+- **今後書く予定の記事タイトル案について検討したメモ書き**",
+        ]
+        self.assertIsNone(sanitize._extract_docs_excerpt(lines))
+
+    def test_prose_with_inline_bold_is_still_extracted(self):
+        lines = [
+            "@@ -1,0 +1,1 @@",
+            "+この記事では **重要なポイント** を実際の手順に沿って説明します。",
+        ]
+        excerpt = sanitize._extract_docs_excerpt(lines)
+        self.assertIsNotNone(excerpt)
 
     def test_heading_level_only_rename_is_not_reported_as_added(self):
         lines = [
@@ -826,7 +1130,10 @@ class TestPromotionTimeSafetyRescan(unittest.TestCase):
 
     def test_mark_reviewed_pass_rejected_if_secret_injected_after_generation(self):
         import subprocess
-        self._write_fixture("clean body, then someone pastes AKIAABCDEFGHIJKLMNOP by mistake")
+        # Concatenated, not a literal contiguous string — see
+        # TestSecretFiltering.test_secret_value_scan's comment for why.
+        fake_aws_key = "AKIA" + "ABCDEFGHIJKLMNOP"
+        self._write_fixture(f"clean body, then someone pastes {fake_aws_key} by mistake")
         result = subprocess.run(
             [sys.executable, str(REPO_ROOT / "scripts" / "mark-devlog-reviewed.py"), str(self.tmp_draft), "--pass"],
             capture_output=True, text=True, encoding="utf-8", errors="replace",

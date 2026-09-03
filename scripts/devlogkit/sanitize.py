@@ -72,7 +72,18 @@ STRUCTURAL_PATH_RE = re.compile(r"^(_layouts/|_includes/)|\.(css|scss|sass|less)
 # quoting one verbatim would render as literal "[ ]" text rather than a
 # checkbox — and out of context, a checklist item read as if it were prose
 # is also just confusing to a reader regardless of rendering.
-MD_STRUCTURAL_RE = re.compile(r"^\+\s*(#{1,6}\s|```|---\s*$|\|.*\|$|\{:.*\}\s*$|[-*]\s*\[[ xX]\]\s)")
+#
+# A numbered/bulleted line whose ENTIRE content is one bold span (Phase
+# 2.7, e.g. "2. **Arduino IDEのインストール方法...**" from an internal
+# content-planning list) is structurally an index/catalog entry — a
+# title, not a sentence a human wrote for a reader — regardless of which
+# file it came from. Excluding this shape is general (not tied to any
+# specific project filename): a `\d+\.` or `-`/`*` marker followed by a
+# SINGLE bold span with nothing else on the line.
+MD_STRUCTURAL_RE = re.compile(
+    r"^\+\s*(#{1,6}\s|```|---\s*$|\|.*\|$|\{:.*\}\s*$|[-*]\s*\[[ xX]\]\s"
+    r"|(?:\d+\.|[-*])\s*\*\*[^*]+\*\*\s*$)"
+)
 # Recognizes an added Markdown H2/H3 heading's TEXT (separate from
 # MD_STRUCTURAL_RE, which excludes headings from prose excerpts — this
 # captures them instead, as a distinct "section added" signal; see
@@ -138,7 +149,12 @@ FRONTMATTER_LINE_RE = re.compile(r"^\+\s*(?:[a-zA-Z_][a-zA-Z0-9_]*:\s|[a-zA-Z_][
 # block boundaries (read once via `git show <hash>:<path>`), so EVERY
 # added line inside that block — key line or wrapped continuation alike —
 # is excluded, regardless of what it looks like.
-HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+#
+# Captures BOTH the old-file and new-file starting line numbers (Phase
+# 2.7: the old-file number is needed to also exclude REMOVED frontmatter
+# lines — see _filter_out_frontmatter_lines's old_frontmatter_range
+# parameter). group(1) = old start, group(2) = new start.
+HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 MAX_DOCS_EXCERPT_CHARS = 200
 MAX_ITEMS_PER_LIST = 8
@@ -157,35 +173,52 @@ def _frontmatter_line_range(full_text):
     return None
 
 
-def _filter_out_frontmatter_lines(diff_lines, frontmatter_range):
+def _filter_out_frontmatter_lines(diff_lines, frontmatter_range, old_frontmatter_range=None):
     """Drop any added ('+') diff line whose position in the NEW file falls
-    within frontmatter_range, tracking position via @@ hunk headers.
-    Non-added lines (context, removed, hunk headers) pass through
-    unchanged, so hunk structure is preserved for
-    _extract_single_line_replacement's per-hunk counting."""
-    if frontmatter_range is None:
+    within frontmatter_range, AND any removed ('-') diff line whose
+    position in the OLD file falls within old_frontmatter_range, tracking
+    both positions via @@ hunk headers.
+
+    Phase 2.7 fix (docs/devlog-policy.md §31 carried-over MAJOR): the
+    original version only tracked added-line positions, so a REMOVED
+    frontmatter continuation line survived through to
+    _extract_single_line_replacement, where it could pair with an
+    unrelated added body line as a misleading "single-line before/after" —
+    two strings that are both real diff content, but whose juxtaposition
+    as "変更前"/"変更後" was never actually a single coherent edit.
+    old_frontmatter_range is optional (None for a newly-created file, which
+    has no old version and therefore no removed frontmatter lines to
+    filter) — passing None here preserves the pre-2.7 added-only behavior.
+
+    Context lines pass through unchanged so hunk structure is preserved
+    for _extract_single_line_replacement's per-hunk counting."""
+    if frontmatter_range is None and old_frontmatter_range is None:
         return diff_lines
-    start, end = frontmatter_range
     out = []
     new_line_no = None
+    old_line_no = None
     for line in diff_lines:
         m = HUNK_HEADER_RE.match(line)
         if m:
-            new_line_no = int(m.group(1))
+            old_line_no = int(m.group(1))
+            new_line_no = int(m.group(2))
             out.append(line)
             continue
         if new_line_no is None or line.startswith("+++"):
             out.append(line)
             continue
         if line.startswith("+"):
-            if not (start <= new_line_no <= end):
+            if frontmatter_range is None or not (frontmatter_range[0] <= new_line_no <= frontmatter_range[1]):
                 out.append(line)
             new_line_no += 1
         elif line.startswith("-"):
-            out.append(line)  # removed lines don't consume a new-file line number
+            if old_frontmatter_range is None or not (old_frontmatter_range[0] <= old_line_no <= old_frontmatter_range[1]):
+                out.append(line)
+            old_line_no += 1
         else:
             out.append(line)
             new_line_no += 1
+            old_line_no += 1
     return out
 
 
@@ -373,7 +406,7 @@ def _extract_config_keys(diff_lines, frontmatter_range):
     for line in diff_lines:
         m = HUNK_HEADER_RE.match(line)
         if m:
-            new_line_no = int(m.group(1))
+            new_line_no = int(m.group(2))
             continue
         if new_line_no is None or line.startswith("+++"):
             continue
@@ -396,10 +429,11 @@ def build_sanitized_summary(repo_path, commit, files):
     headings_added = []
     config_keys_changed = []
     structural_files_changed = []
-    per_file_signals = []  # [{"path", "functions", "classes", "tests", "headings", "config_keys"}]
+    per_file_signals = []  # [{"path", "commit_hash", "functions", "classes", "tests", "headings", "config_keys"}]
     evidence = []
     behavior_before = None
     behavior_after = None
+    behavior_path = None
     files_skipped_for_safety = []
 
     for f in files:
@@ -464,11 +498,23 @@ def build_sanitized_summary(repo_path, commit, files):
                 frontmatter_range = _frontmatter_line_range(full_text)
             except RuntimeError:
                 frontmatter_range = None
-            body_lines = _filter_out_frontmatter_lines(lines, frontmatter_range)
+            # Phase 2.7: also resolve the file's frontmatter range as of
+            # the PARENT commit (the "old" version this diff is against),
+            # so _filter_out_frontmatter_lines can exclude REMOVED
+            # frontmatter lines too, not just added ones (see that
+            # function's docstring). A newly-created file has no parent
+            # version — RuntimeError there just means "nothing to
+            # exclude", not an error worth surfacing.
+            try:
+                old_full_text = gitmeta.get_full_file_at_commit(repo_path, commit["hash"] + "^", path)
+                old_frontmatter_range = _frontmatter_line_range(old_full_text)
+            except RuntimeError:
+                old_frontmatter_range = None
+            body_lines = _filter_out_frontmatter_lines(lines, frontmatter_range, old_frontmatter_range)
 
             excerpt = _extract_docs_excerpt(body_lines)
             if excerpt and not security.contains_secret_pattern(excerpt):
-                docs_excerpts.append({"path": path, "text": excerpt})
+                docs_excerpts.append({"path": path, "commit_hash": commit["hash"], "text": excerpt})
                 evidence.append(f"{commit['hash'][:7]}:{path} (docs/README prose excerpt)")
 
             file_headings = [
@@ -492,7 +538,8 @@ def build_sanitized_summary(repo_path, commit, files):
             # lets the article say e.g. "scripts/devlogkit/security.py:
             # 関数 die、skip" instead of one undifferentiated cross-file list.
             per_file_signals.append({
-                "path": path, "functions": funcs, "classes": classes, "tests": tests,
+                "path": path, "commit_hash": commit["hash"],
+                "functions": funcs, "classes": classes, "tests": tests,
                 "headings": file_headings, "config_keys": file_keys,
             })
 
@@ -507,6 +554,7 @@ def build_sanitized_summary(repo_path, commit, files):
                     highlighted = _highlight_diff_pair(before, after)
                     if highlighted:
                         behavior_before, behavior_after = highlighted
+                        behavior_path = path
                         evidence.append(f"{commit['hash'][:7]}:{path} (single-line before/after)")
 
     return {
@@ -520,6 +568,8 @@ def build_sanitized_summary(repo_path, commit, files):
         "per_file_signals": per_file_signals,
         "behavior_before": behavior_before,
         "behavior_after": behavior_after,
+        "behavior_path": behavior_path,
+        "behavior_commit_hash": commit["hash"] if behavior_before is not None else None,
         "evidence": evidence,
         "files_skipped_for_safety": files_skipped_for_safety,
     }
@@ -547,5 +597,8 @@ def merge_day_summaries(commit_summaries):
                     merged[key].append(item)
         merged["per_file_signals"].extend(s["per_file_signals"])
         if s["behavior_before"] is not None:
-            merged["behavior_pairs"].append((s["behavior_before"], s["behavior_after"]))
+            merged["behavior_pairs"].append({
+                "before": s["behavior_before"], "after": s["behavior_after"],
+                "path": s.get("behavior_path"), "commit_hash": s.get("behavior_commit_hash"),
+            })
     return merged

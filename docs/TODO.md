@@ -21,6 +21,40 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
 
 ## Completed
 
+- Dev Log自動化 Phase 2.7(A-grade Article Quality Sprint)完了。目的: Phase 2.6で
+  AUTO_PUBLISH_CANDIDATEに到達した2026-08-08(82点)・2026-08-20(81点)の2記事
+  (いずれも独立レビューでグレードB)を、スコアを上げずに人手修正不要のグレードAへ
+  引き上げる(汎用的なgenerator改善のみ、特定2記事のハードコード禁止)。変更:
+  `scripts/devlogkit/ja.py`("and"の中黒〈・〉変換・未マッピング語の大文字保持
+  `KNOWN_ACRONYMS`)、`templates.py`(`_select_headline_phrase`共有化でtitle/
+  description言語不整合を構造的に解消、`derive_topic_keyword`でprimary_keyword/
+  search_intentを記事固有化、numbered-bold-title excerptノイズ除外、
+  `_changed_files_section`のcommitスコープ拡張、`_change_composition_overview`
+  機械的カウント文の新設、README/変更前後セクションへのcommit hash帰属追加)、
+  `sanitize.py`(`_extract_single_line_replacement`のfrontmatter境界問題を解消
+  =§31/§37からの持ち越し1件を解消)、`score.py`(Evidence Strength軸のbaseline/
+  evidence件数加点の配分を調整し他軸との重複を部分的に緩和=§31/§37の持ち越し
+  もう1件を部分対応。完全な再設計ではない)、`pipeline.py`(description/
+  primary_keyword/search_intentの呼び出し側統合)。`docs/devlog-policy.md`39-44節に追記。
+  independent-reviewerを5サイクル実施(1周目: 両記事B級判定、2周目コード:
+  BLOCKER1〈templates/パス重複、Phase2.6由来〉・MAJOR1〈description言語不整合再発〉
+  →修正、3周目: 新設した機械的カウント文自体の集計がsanitize.pyのMAX_ITEMS_PER_LIST
+  切り詰めと詳細セクションの生データの不一致でBLOCKER〈8件と主張し実際は9件〉→
+  カウント元をper_file_signals等の生データに統一して修正、4周目: README/変更前後
+  セクションにcommit帰属がなく異なるファイル・commitの偶然の文言一致が自己矛盾に
+  見えるBLOCKER懸念→両セクションに帰属追加、5周目: 見出し自己矛盾はBLOCKER 0を
+  確認、ただしprimary_keyword/titleの自然な検索クエリとしての品質はMAJOR
+  1件として両記事とも未解消)。`scripts/test_devlog.py`79/79 PASS(58→79、21件
+  新規追加)、`validate-site.py`全項目PASS、`git diff --check`問題なし。Promotion
+  E2E・tamper-attack実証を両記事で実施(reviewer_status: pass記録→改変コピーは
+  拒否→未改変オリジナルは全ゲート通過で`_articles/`昇格に成功→実験後に削除、
+  本番`_articles/`/`drafts/`に残留物なしを確認)。**結論**: BLOCKER 3件・複数の
+  MAJORを発見・修正し記事の事実性・整合性・可読性は大きく向上したが、
+  primary_keyword/titleの検索意図に基づく自然さは「LLMを使わない決定論的
+  パイプラインの設計上の境界」と判断し、次のOwner判断を申し送り(A)人による
+  最終確認・書き換え工程を明示的に維持する(既存のDev Log Gateの想定どおり)、
+  (B)強いガードレール付きのLLM支援キーワード提案ステップを別途検討する。
+  **READY_FOR_PHASE_3: NO**(2記事ともグレードB・MAJOR1件残存のため)
 - Dev Log自動化 Phase 2.6(Technical Depth軸拡張)完了。目的: Phase 2.5が「AUTO_PUBLISH_
   CANDIDATE 0件」の主因とした、Technical Depth軸がPython/JS/Go向けfunctions/classes/tests
   正規表現しか見ておらずこのリポジトリの実作業(記事執筆・Jekyll layout/include/
@@ -236,19 +270,23 @@ Blockedは現在有効なものだけを残す。それより古い完了履歴�
 
 ## Owner Action Required
 
-1. **Dev Log Phase 3判断(READY_FOR_PHASE_3: NO)**: Phase 2.5の結論により、20:00完全自動運用
-   (Phase 3、スケジューラ登録・他project有効化)へは進んでいない(指示どおり)。実データで
-   score≥80のAUTO_PUBLISH_CANDIDATEが1件も出ていない(直近3日は79点で1点差)ため、
-   このまま「score≥80=人の手直し不要」と信頼してPhase 3(無人自動promotion)へ進むのは
-   時期尚早。選択肢: (a)Technical Depth軸の抽出をこのリポジトリ(記事中心)に合わせて
-   さらに拡張する追加ラウンドを実施してから再評価する、(b)DRAFT_ONLYまでは自動化し
-   AUTO_PUBLISH(無人昇格)は当面手動レビュー必須のまま運用する、(c)10日以上の分布を
-   踏まえた上で閾値自体の妥当性を再検討する(今回のSprintの都合のみでの引き下げは
-   明示的に禁止されている)。方針判断が必要
-2. `docs/devlog-policy.md`31節に記録した既知の未修正MAJOR2件(score.pyのEvidence
-   Strength軸が他軸と実質重複している設計上の緊張、`sanitize.py`の
-   `_extract_single_line_replacement`がfrontmatter境界を跨ぐ稀なケースで無関係な
-   文字列をペア化しうる可能性)を、次のDev Log関連ラウンドで対応するかどうかの優先度判断
+1. **Dev Log Phase 3判断(READY_FOR_PHASE_3: NO、Phase 2.7時点)**: Phase 2.6でscore≥80の
+   AUTO_PUBLISH_CANDIDATEを2件(2026-08-08=82点・2026-08-20=81点)実現し、Phase 2.7で
+   両記事の事実性・整合性・可読性を大きく改善したが(BLOCKER3件・複数MAJORを検出・修正)、
+   独立レビューの最終判定はいずれもグレードB(primary_keyword/titleが「読者が実際に
+   検索する自然な日本語クエリ」になっていないというMAJORが1件ずつ残存)。これは
+   `docs/devlog-policy.md`42節のとおり実装バグではなく「LLMを使わない決定論的パイプライン
+   の設計上の境界」と判断した。方針判断が必要: (a)primary_keyword/titleの最終確認・
+   書き換えを`_articles/`昇格前の人によるレビュー工程として明示的に維持する(既存の
+   Dev Log Gateの想定どおり運用を続ける)、(b)強いガードレール付き(生成された事実のみを
+   入力、出力を短いキーワード候補に限定等)のLLM支援キーワード提案ステップを別ラウンドで
+   検討する、(c)score≥80=無人自動promotion可、という前提自体をPhase 3で採用するかどうか
+   (現状は(a)を前提にしないと安全に運用できない)
+2. score.pyのEvidence Strength軸が他軸と実質重複している設計上の緊張は、Phase 2.7で
+   部分的に緩和した(baselineを他軸から独立した項目へ引き上げ、最も重複する「evidence
+   件数」の加点を半減。詳細は`docs/devlog-policy.md`40節)が、完全な再設計はまだ行って
+   いない(次のDev Log関連ラウンドでの課題として残る)。なお`sanitize.py`の
+   `_extract_single_line_replacement`のfrontmatter境界問題はPhase 2.7で解消済み(40節)
 3. Amazon.co.jpアソシエイト規約について、英語表記のみで日本向けサイトとして十分かは規約に明記が
    なく確認できなかった点の最終確認(現状は日本語必須文言+英語補足で対応済み、追加対応の要否は任意)
 4. CONTENT_PLAN.mdへ新規提案した2記事は両方とも公開済み(カテゴリE「実践プロジェクト作品集」に

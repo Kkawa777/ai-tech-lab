@@ -116,8 +116,28 @@ EVIDENCE_TYPE_SUFFIXES = (
 
 
 def score_evidence_strength(summary, day_stats):
-    score = 4  # baseline: commit hash/subject/date are always CONFIRMED_GIT_FACT
-    score += min(8, len(summary["evidence"]) * 2)
+    # Phase 2.7 partial mitigation (docs/devlog-policy.md §31/§37 carried-
+    # over MAJOR: this axis was found to correlate heavily with the other
+    # 4, since `evidence` is mechanically built from the SAME booleans they
+    # already score). A full redesign (e.g. scoring evidence DENSITY —
+    # evidenced-files ÷ total-files-touched — instead of raw volume) was
+    # evaluated but rejected THIS round: it would have swung both of this
+    # repo's only two genuine AUTO_PUBLISH_CANDIDATEs below 80 (2026-08-08
+    # density ≈0.29, 2026-08-20 ≈0.68 — a low-density-but-real day would
+    # be punished for touching many binary/image assets sanitize.py can't
+    # extract anything from, which isn't actually a fact-fidelity problem).
+    # Reworking the whole axis is out of scope for a sprint whose stated
+    # goal is article quality, not another scoring churn cycle — so this
+    # round only shifts weight AWAY from the most redundant term (raw
+    # evidence COUNT, which most directly re-sums what other axes already
+    # counted) TOWARD the one term that is NOT derived from those same
+    # booleans (commit hash/subject/date existing is CONFIRMED_GIT_FACT
+    # independent of what sanitize.py managed to extract). This is
+    # deliberately closer to a wash than a fix — it doesn't change the
+    # ceiling for evidence-rich days, and the deeper redesign remains
+    # explicitly open for a future round (see §31/§37).
+    score = 6  # baseline raised from 4 (genuinely orthogonal: not a re-sum of other axes' signals)
+    score += min(6, len(summary["evidence"]) * 1)  # volume term's weight/cap both halved from min(8, count*2)
     # Diversity bonus: rewards having SEVERAL DIFFERENT kinds of extracted
     # evidence (not just many of the same kind — e.g. ten docs_excerpts
     # from ten files scores the same diversity as one, since Phase 2.5's

@@ -108,19 +108,30 @@ def run(project_key: str, entry: dict, repo_path: Path, date_str: str) -> Pipeli
     body = templates.render_body(day_type, display_name, notable, merged_summary)
 
     subjects_cleaned = [templates.clean_subject(c["subject"]) for c in notable]
-    # Phase 2.6: translate each subject independently for the description
-    # (falling back to the original English per-subject, not per-day, when
-    # a given subject doesn't meet ja.coverage_is_usable()) — previously
-    # this always embedded the raw English subjects verbatim even when the
-    # title above translated cleanly, which an independent review flagged
-    # as an inconsistency that reads like a generation bug.
-    subjects_for_description = [templates.translated_or_original(s)[0] for s in subjects_cleaned]
-    description = (
-        f"{date_str}に{display_name}リポジトリで行われた開発のログです。"
-        f"Git履歴とdiffから確認できる変更: {'、'.join(subjects_for_description[:5])}"
-        f"{f' ほか{len(subjects_for_description) - 5}件' if len(subjects_for_description) > 5 else ''}。"
+    # Phase 2.6 translated each subject independently for the description
+    # (mixing Japanese and English mid-sentence when only some subjects
+    # translated), then Phase 2.7 tried "all-or-nothing per day" instead —
+    # but independent review (twice) found THAT still let description
+    # disagree with title on a multi-commit day: title only needs ONE
+    # qualifying commit, so it could be fully Japanese while description's
+    # stricter all-must-qualify rule fell back to all-English on the
+    # SAME day. Now description is built from the exact same choice
+    # build_headline made for the title (templates.describe_day), so the
+    # two can never disagree about which language was used.
+    description = templates.describe_day(date_str, display_name, notable)
+    # Phase 2.7: primary_keyword previously depended only on day_type
+    # (e.g. every "feature" day got the identical "AI-Tech-Lab 新機能"),
+    # which an independent review flagged as an SEO keyword-cannibalization
+    # risk once multiple devlog articles of the same type exist — none of
+    # them would have a distinguishable primary_keyword. Use the day's own
+    # translated topic (the same noun phrase build_headline would use, via
+    # a fresh per-commit trial) when available, falling back to the
+    # day_type label only when nothing translates.
+    topic_keyword = templates.derive_topic_keyword(notable)
+    primary_keyword = (
+        f"{display_name} {topic_keyword} 開発ログ" if topic_keyword
+        else f"{display_name} {classify.DAY_TYPE_JA_LABEL.get(day_type, '開発ログ')}"
     )
-    primary_keyword = f"{display_name} {classify.DAY_TYPE_JA_LABEL.get(day_type, '開発ログ')}"
     social_summary = title[:140]
 
     screenshot_candidates = screenshots.discover_candidates(repo_path, date_str)
@@ -137,7 +148,13 @@ def run(project_key: str, entry: dict, repo_path: Path, date_str: str) -> Pipeli
         "description": description,
         "content_type": "devlog",
         "primary_keyword": primary_keyword,
-        "search_intent": f"{display_name}の開発状況・変更履歴を知りたい",
+        # Phase 2.7: same anti-cannibalization reasoning as primary_keyword
+        # above — parameterize with the day's own topic when translatable
+        # rather than an identical generic sentence on every devlog article.
+        "search_intent": (
+            f"{display_name}の{topic_keyword}に関する開発状況を知りたい" if topic_keyword
+            else f"{display_name}の開発状況・変更履歴を知りたい"
+        ),
         "monetization": "none",
         "conversion_goal": None,
         "source_project": project_key,
